@@ -118,7 +118,7 @@ def export_to_make_format(df, section_type="update"):
             "comp_name": str(row.get("اسم المنافس", "")),
             "comp_price": float(row.get("أقل سعر منافس", 0)),
             "diff": float(row.get("الفرق", 0)),
-            "match_score": float(row.get("نسبة التطابق", 0)),
+            "match_score": float(row.get("نسبة_التطابق", 0)),
             "decision": str(row.get("القرار", "")),
             "brand": str(row.get("الماركة", "")),
             "competitor": str(row.get("المنافس", ""))
