@@ -156,8 +156,16 @@ KNOWN_BRANDS = [
     "Maison Margiela","Memo Paris","Penhaligons","Serge Lutens","Diptyque",
     "Frederic Malle","Francis Kurkdjian","Floris","Clive Christian",
     "Ormonde Jayne","Zoologist","Tauer","Lush","The Different Company",
+    "Missoni","Juicy Couture","Moschino","Dunhill","Bentley","Jaguar",
+    "Boucheron","Chopard","Elie Saab","Escada","Ferragamo","Fendi",
+    "Kenzo","Lacoste","Loewe","Rochas","Roberto Cavalli","Tiffany",
+    "Van Cleef","Azzaro","Banana Republic","Benetton","Bottega Veneta",
+    "Celine","Dsquared2","Ed Hardy","Elizabeth Arden","Ermenegildo Zegna",
+    "Swiss Arabian","Ard Al Zaafaran","Nabeel","Asdaaf","Maison Alhambra",
     "لطافة","العربية للعود","رصاصي","أجمل","الحرمين","أرماف",
     "أمواج","كريد","توم فورد","ديور","شانيل","غوتشي","برادا",
+    "ميسوني","جوسي كوتور","موسكينو","دانهيل","بنتلي",
+    "كينزو","لاكوست","فندي","ايلي صعب","ازارو",
     "Guerlain","Givenchy","Sisley","Issey Miyake","Davidoff","Mexx",
 ]
 
