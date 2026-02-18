@@ -41,6 +41,21 @@ def get_main_css():
 .multi-comp{background:rgba(0,123,255,.06);border:1px solid rgba(0,123,255,.2);border-radius:6px;padding:8px;margin:4px 0}
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0E1117,#1A1A2E)}
 #MainMenu,footer,header{visibility:hidden}
+/* إصلاح مشكلة arr✓✓ight - إخفاء أيقونات Streamlit المكسورة */
+[data-testid="stExpander"] summary svg,
+[data-testid="stSelectbox"] svg[data-testid="stExpanderToggleIcon"],
+details summary span[data-testid] svg {
+    font-family: system-ui, -apple-system, sans-serif !important;
+}
+/* تحسين عرض Expander و Selectbox مع النصوص العربية */
+[data-testid="stExpander"] summary {
+    direction: rtl;
+    font-family: 'Tajawal', sans-serif !important;
+}
+.stSelectbox label, .stMultiSelect label {
+    direction: rtl;
+    font-family: 'Tajawal', sans-serif !important;
+}
 </style>"""
 
 
