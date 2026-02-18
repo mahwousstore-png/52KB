@@ -9,13 +9,14 @@ from config import WEBHOOK_UPDATE_PRICES, WEBHOOK_NEW_PRODUCTS
 
 
 def send_price_updates(products, webhook_url=None):
-    """إرسال تحديثات الأسعار إلى Make.com"""
+    """إرسال تحديثات الأسعار إلى Make.com بتنسيق MAKE_INTEGRATION_GUIDE"""
     url = webhook_url or WEBHOOK_UPDATE_PRICES
     try:
         payload = {
-            "type": "price_updates",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "count": len(products),
+            "event_type": "price_update",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "source": "perfume_pricing_system_v16",
+            "total_products": len(products),
             "products": products
         }
         resp = requests.post(url, json=payload, timeout=15)
@@ -29,13 +30,14 @@ def send_price_updates(products, webhook_url=None):
 
 
 def send_new_products(products, webhook_url=None):
-    """إرسال منتجات جديدة/مفقودة إلى Make.com"""
+    """إرسال منتجات جديدة إلى Make.com بتنسيق MAKE_INTEGRATION_GUIDE"""
     url = webhook_url or WEBHOOK_NEW_PRODUCTS
     try:
         payload = {
-            "type": "new_products",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "count": len(products),
+            "event_type": "new_products",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "source": "perfume_pricing_system_v16",
+            "total_products": len(products),
             "products": products
         }
         resp = requests.post(url, json=payload, timeout=15)
@@ -49,13 +51,14 @@ def send_new_products(products, webhook_url=None):
 
 
 def send_missing_products(products, webhook_url=None):
-    """إرسال المنتجات المفقودة إلى Make.com"""
+    """إرسال المنتجات المفقودة إلى Make.com بتنسيق MAKE_INTEGRATION_GUIDE"""
     url = webhook_url or WEBHOOK_NEW_PRODUCTS
     try:
         payload = {
-            "type": "missing_products",
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "count": len(products),
+            "event_type": "missing_products",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "source": "perfume_pricing_system_v16",
+            "total_products": len(products),
             "products": products
         }
         resp = requests.post(url, json=payload, timeout=15)
@@ -109,19 +112,26 @@ def verify_webhook_connection():
 
 
 def export_to_make_format(df, section_type="update"):
-    """تحويل DataFrame إلى صيغة Make"""
+    """تحويل DataFrame إلى صيغة Make حسب MAKE_INTEGRATION_GUIDE"""
     products = []
     for _, row in df.iterrows():
+        our_price = float(row.get("السعر", 0))
+        comp_price = float(row.get("سعر_المنافس", 0))
+        diff = our_price - comp_price
+        diff_pct = (diff / comp_price * 100) if comp_price > 0 else 0
+        
         product = {
-            "name": str(row.get("المنتج", "")),
-            "our_price": float(row.get("السعر", 0)),
-            "comp_name": str(row.get("اسم المنافس", "")),
-            "comp_price": float(row.get("أقل سعر منافس", 0)),
-            "diff": float(row.get("الفرق", 0)),
-            "match_score": float(row.get("نسبة_التطابق", 0)),
-            "decision": str(row.get("القرار", "")),
-            "brand": str(row.get("الماركة", "")),
-            "competitor": str(row.get("المنافس", ""))
+            "product_name": str(row.get("المنتج", "")),
+            "old_price": our_price,
+            "new_price": comp_price - 1 if comp_price > 0 else our_price,  # سعر مقترح
+            "price_change": diff,
+            "price_change_pct": round(diff_pct, 2),
+            "competitor_name": str(row.get("المنافس", "")),
+            "competitor_price": comp_price,
+            "confidence": int(row.get("نسبة_التطابق", 0)),
+            "risk_level": str(row.get("الخطورة", "عادي")),
+            "match_stage": str(row.get("مصدر_المطابقة", "fuzzy")),
+            "reason": str(row.get("القرار", ""))
         }
         products.append(product)
     return products
