@@ -37,6 +37,7 @@ except:
         "Boucheron","Chopard","Elie Saab","Escada","Ferragamo","Fendi",
         "Kenzo","Lacoste","Loewe","Rochas","Roberto Cavalli","Tiffany",
         "Van Cleef","Azzaro","Chloe","Elizabeth Arden","Swiss Arabian",
+        "Xerjoff","Penhaligon","Clive Christian","Floris","Acqua di Parma",
         "Ard Al Zaafaran","Nabeel","Asdaaf","Maison Alhambra",
         "لطافة","العربية للعود","رصاصي","أجمل","الحرمين","أرماف",
         "أمواج","كريد","توم فورد","ديور","شانيل","غوتشي","برادا",
@@ -44,7 +45,7 @@ except:
         "كينزو","لاكوست","فندي","ايلي صعب","ازارو",
     ]
     WORD_REPLACEMENTS = {}
-    MATCH_THRESHOLD = 62; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
+    MATCH_THRESHOLD = 68; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
     PRICE_TOLERANCE = 5; TESTER_KEYWORDS = ["tester","تستر"]; SET_KEYWORDS = ["set","طقم","مجموعة"]
     GEMINI_API_KEYS = []
 
@@ -399,8 +400,8 @@ class CompIndex:
             if our_br and c_br:
                 base += 8 if normalize(our_br)==normalize(c_br) else -22
             elif our_br and not c_br:
-                # منتجنا له ماركة معروفة لكن المنافس بدون ماركة → خصم
-                base -= 15
+                # منتجنا له ماركة معروفة لكن المنافس بدون ماركة → خصم كبير
+                base -= 20
             if our_sz > 0 and c_sz > 0:
                 d = abs(our_sz - c_sz)
                 base += 8 if d==0 else (-5 if d<=5 else -15 if d<=20 else -28)
