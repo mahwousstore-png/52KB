@@ -75,8 +75,10 @@ def send_to_make(data, webhook_type="update"):
     """دالة عامة للإرسال إلى Make"""
     if webhook_type == "update":
         return send_price_updates(data)
-    elif webhook_type in ["new", "missing"]:
+    elif webhook_type == "new":
         return send_new_products(data)
+    elif webhook_type == "missing":
+        return send_missing_products(data)
     return {"success": False, "message": "نوع غير معروف"}
 
 
@@ -113,25 +115,60 @@ def verify_webhook_connection():
 
 def export_to_make_format(df, section_type="update"):
     """تحويل DataFrame إلى صيغة Make حسب MAKE_INTEGRATION_GUIDE"""
+    from engines.engine import extract_brand, extract_size, classify_product
     products = []
     for _, row in df.iterrows():
-        our_price = float(row.get("السعر", 0))
-        comp_price = float(row.get("سعر_المنافس", 0))
-        diff = our_price - comp_price
-        diff_pct = (diff / comp_price * 100) if comp_price > 0 else 0
-        
-        product = {
-            "product_name": str(row.get("المنتج", "")),
-            "old_price": our_price,
-            "new_price": comp_price - 1 if comp_price > 0 else our_price,  # سعر مقترح
-            "price_change": diff,
-            "price_change_pct": round(diff_pct, 2),
-            "competitor_name": str(row.get("المنافس", "")),
-            "competitor_price": comp_price,
-            "confidence": int(row.get("نسبة_التطابق", 0)),
-            "risk_level": str(row.get("الخطورة", "عادي")),
-            "match_stage": str(row.get("مصدر_المطابقة", "fuzzy")),
-            "reason": str(row.get("القرار", ""))
-        }
+        if section_type == "update":
+            our_price = float(row.get("السعر", 0) or 0)
+            comp_price = float(row.get("سعر_المنافس", 0) or 0)
+            diff = our_price - comp_price
+            diff_pct = (diff / comp_price * 100) if comp_price > 0 else 0
+            product = {
+                "product_name": str(row.get("المنتج", "")),
+                "old_price": our_price,
+                "new_price": comp_price - 1 if comp_price > 0 else our_price,
+                "price_change": round(diff, 2),
+                "price_change_pct": round(diff_pct, 2),
+                "competitor_name": str(row.get("المنافس", "")).replace('.csv','').replace('.xlsx',''),
+                "competitor_price": comp_price,
+                "confidence": int(float(row.get("نسبة_التطابق", 0) or 0)),
+                "risk_level": str(row.get("الخطورة", "عادي")).replace("🔴 ","").replace("🟡 ","").replace("🟢 ",""),
+                "match_stage": str(row.get("مصدر_المطابقة", "fuzzy")),
+                "reason": str(row.get("القرار", ""))
+            }
+        elif section_type == "missing":
+            pname = str(row.get("منتج_المنافس", ""))
+            comp_price = float(row.get("سعر_المنافس", 0) or 0)
+            brand = str(row.get("الماركة", "")) or extract_brand(pname)
+            size_val = extract_size(pname)
+            product = {
+                "product_name": pname,
+                "competitor_name": str(row.get("المنافس", "")).replace('.csv','').replace('.xlsx',''),
+                "competitor_price": comp_price,
+                "brand": brand if brand else "Unknown",
+                "size": f"{int(size_val)}ml" if size_val else str(row.get("الحجم", "")),
+                "type": classify_product(pname),
+                "recommendation": "إضافة مقترحة" if comp_price > 0 else "مراجعة",
+                "profitability": "عالية" if comp_price > 100 else "متوسطة",
+                "suggested_price": comp_price - 1 if comp_price > 0 else 0
+            }
+        else:  # new
+            pname = str(row.get("المنتج", row.get("منتج_المنافس", "")))
+            comp_price = float(row.get("سعر_المنافس", 0) or 0)
+            brand = str(row.get("الماركة", "")) or extract_brand(pname)
+            size_val = extract_size(pname)
+            product = {
+                "product_name": pname,
+                "price": comp_price - 1 if comp_price > 0 else 0,
+                "brand": brand if brand else "Unknown",
+                "size": f"{int(size_val)}ml" if size_val else str(row.get("الحجم", "")),
+                "type": classify_product(pname),
+                "competitor_name": str(row.get("المنافس", "")).replace('.csv','').replace('.xlsx',''),
+                "competitor_price": comp_price,
+                "confidence": int(float(row.get("نسبة_التطابق", 0) or 0)),
+                "profitability": "عالية" if comp_price > 100 else "متوسطة",
+                "description": f"عطر {brand} {int(size_val)}ml" if brand and size_val else pname,
+                "category": "عطور"
+            }
         products.append(product)
     return products
