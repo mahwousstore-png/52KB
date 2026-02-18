@@ -37,12 +37,20 @@ except:
         "Boucheron","Chopard","Elie Saab","Escada","Ferragamo","Fendi",
         "Kenzo","Lacoste","Loewe","Rochas","Roberto Cavalli","Tiffany",
         "Van Cleef","Azzaro","Chloe","Elizabeth Arden","Swiss Arabian",
-        "Xerjoff","Penhaligon","Clive Christian","Floris","Acqua di Parma",
+        "Penhaligons","Clive Christian","Floris","Acqua di Parma",
         "Ard Al Zaafaran","Nabeel","Asdaaf","Maison Alhambra",
-        "لطافة","العربية للعود","رصاصي","أجمل","الحرمين","أرماف",
+        "Tiziana Terenzi","Maison Francis Kurkdjian","Serge Lutens",
+        "Frederic Malle","Ormonde Jayne","Zoologist","Tauer",
+        "Banana Republic","Benetton","Bottega Veneta","Celine","Dsquared2",
+        "Ermenegildo Zegna","Sisley","Mexx","Amadou","Thameen",
+        "لطافة","العربية للعود","رصاسي","أجمل","الحرمين","أرماف",
         "أمواج","كريد","توم فورد","ديور","شانيل","غوتشي","برادا",
         "ميسوني","جوسي كوتور","موسكينو","دانهيل","بنتلي",
         "كينزو","لاكوست","فندي","ايلي صعب","ازارو",
+        "كيليان","نيشان","زيرجوف","بنهاليغونز","مارلي","جيرلان",
+        "تيزيانا ترينزي","مايزون فرانسيس","بايريدو","لي لابو",
+        "مانسيرا","مونتالي","روجا","جو مالون","ثمين","أمادو",
+        "ناسوماتو","ميزون مارجيلا","نيكولاي",
     ]
     WORD_REPLACEMENTS = {}
     MATCH_THRESHOLD = 68; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
@@ -83,6 +91,22 @@ _SYN = {
     "سلفاتوري":"ferragamo","سالفاتوري":"ferragamo",
     "ايف سان لوران":"ysl","ايف سانت لوران":"ysl",
     "هيرميس":"hermes","ارميس":"hermes","هرمز":"hermes",
+    "كيليان":"kilian","كليان":"kilian",
+    "نيشان":"nishane","نيشاني":"nishane",
+    "زيرجوف":"xerjoff","زيرجوفف":"xerjoff",
+    "بنهاليغونز":"penhaligons","بنهاليغون":"penhaligons",
+    "مارلي":"parfums de marly","دي مارلي":"parfums de marly",
+    "جيرلان":"guerlain","غيرلان":"guerlain","جرلان":"guerlain",
+    "تيزيانا ترينزي":"tiziana terenzi","تيزيانا":"tiziana terenzi",
+    "ناسوماتو":"nasomatto",
+    "ميزون مارجيلا":"maison margiela","مارجيلا":"maison margiela","ربليكا":"replica",
+    "نيكولاي":"nicolai","نيكولائي":"nicolai",
+    "مايزون فرانسيس":"maison francis kurkdjian","فرانسيس":"maison francis kurkdjian",
+    "بايريدو":"byredo","لي لابو":"le labo",
+    "مانسيرا":"mancera","مونتالي":"montale","روجا":"roja",
+    "جو مالون":"jo malone","جومالون":"jo malone",
+    "ثمين":"thameen","أمادو":"amadou","امادو":"amadou",
+    "انيشيو":"initio","إنيشيو":"initio","initio":"initio",
     " مل":" ml","ملي ":"ml ","ملي":"ml","مل":"ml",
     "أ":"ا","إ":"ا","آ":"ا","ة":"ه","ى":"ي","ؤ":"و","ئ":"ي",
 }
@@ -244,15 +268,24 @@ def extract_product_line(text, brand=""):
     _STOP = [
         'عطر','تستر','تيستر','tester','perfume','fragrance',
         'او دو','او دي','أو دو','أو دي',
-        'بارفان','بارفيوم','برفيوم','parfum','edp','eau de parfum',
+        'بارفان','بارفيوم','برفيوم','بيرفيوم','برفان','parfum','edp','eau de parfum',
         'تواليت','toilette','edt','eau de toilette',
         'كولون','cologne','edc','eau de cologne',
-        'انتنس','intense','اكستريم','extreme','ابسولو','absolue',
+        'انتنس','انتينس','intense','اكستريم','extreme','ابسولو','absolue',
+        'اكستريت','اكسترايت','extrait','extract',
+        'دو','de','du',
+        # أسماء ماركات فرعية تبقى بعد إزالة الماركة الرئيسية
+        'تيرينزي','ترينزي','terenzi','terenzio',  # Tiziana Terenzi
+        'كوركدجيان','كركدجيان','kurkdjian',  # MFK
+        'ميزون','مايزون','maison',  # Maison Margiela/MFK
+        'باريس','paris',  # كلمة شائعة
+        'دوف','dove',  # Roja Dove
         'للرجال','للنساء','رجالي','نسائي','للجنسين',
         'for men','for women','unisex','pour homme','pour femme',
         'ml','مل','ملي','milliliter',
         'كرتون ابيض','كرتون أبيض','white box',
         'اصلي','original','authentic','جديد','new',
+        'اصدار','اصدارات','edition',  # إضافة جديدة
     ]
     for w in _STOP:
         n = n.replace(w, ' ')
@@ -369,45 +402,69 @@ class CompIndex:
             c_gd = self.genders[idx]
             c_pl = self.plines[idx]
 
-            # فلاتر سريعة
+            # ═══ فلاتر سريعة ═══
             if our_br and c_br and normalize(our_br) != normalize(c_br): continue
             if our_sz > 0 and c_sz > 0 and abs(our_sz - c_sz) > 30: continue
             if our_tp and c_tp and our_tp != c_tp:
                 if our_sz > 0 and c_sz > 0 and abs(our_sz - c_sz) > 3: continue
             if our_gd and c_gd and our_gd != c_gd: continue
 
-            # ═══ مقارنة خط الإنتاج (الحل الجذري) ═══
-            # إذا كلا المنتجين لهما ماركة معروفة وخط إنتاج واضح
-            # نقارن خط الإنتاج — إذا مختلف تماماً → رفض
-            pline_penalty = 0
-            if our_pline and c_pl and our_br and c_br:
-                pl_score = fuzz.token_sort_ratio(our_pline, c_pl)
-                if pl_score < 40:
-                    # خطوط إنتاج مختلفة تماماً (هيرو ≠ لندن)
-                    continue  # رفض المطابقة نهائياً
-                elif pl_score < 65:
-                    pline_penalty = -25  # خصم كبير
-                elif pl_score < 80:
-                    pline_penalty = -10  # خصم متوسط
+            # ═══ فلتر تصنيف المنتج (retail/tester/set/hair_mist) ═══
+            our_class = classify_product(our_norm)
+            c_class = classify_product(name)
+            if our_class != c_class:
+                # معطر شعر ≠ عطر عادي، تستر ≠ retail، مجموعة ≠ مفرد
+                if our_class in ('hair_mist','body_mist','set','rejected') or \
+                   c_class in ('hair_mist','body_mist','set','rejected'):
+                    continue
 
-            # score تفصيلي
+            # ═══ مقارنة خط الإنتاج (الحل الجذري) ═══
+            pline_penalty = 0
+            if our_pline and c_pl:
+                pl_score = fuzz.token_sort_ratio(our_pline, c_pl)
+                if our_br and c_br:
+                    # نفس الماركة → مقارنة خط الإنتاج صارمة جداً
+                    # باروندا≠باردون(67%), عنبر≠روز(67%), ربليكا باربرز≠فاير(65%)
+                    # عود مود سليك=عود سيلك مود(73%) → يُقبل
+                    if pl_score < 70:
+                        continue  # رفض نهائي - خطوط إنتاج مختلفة
+                    elif pl_score < 80:
+                        pline_penalty = -20
+                    elif pl_score < 88:
+                        pline_penalty = -10
+                else:
+                    # ماركات مختلفة أو غير معروفة → مقارنة أكثر صرامة
+                    if pl_score < 55:
+                        pline_penalty = -35
+                    elif pl_score < 75:
+                        pline_penalty = -22
+
+            # ═══ score تفصيلي ═══
             n1, n2 = our_norm, self.norm_names[idx]
             s1 = fuzz.token_sort_ratio(n1, n2)
             s2 = fuzz.token_set_ratio(n1, n2)
             s3 = fuzz.partial_ratio(n1, n2)
-            base = s1*0.30 + s2*0.40 + s3*0.30
+            base = s1*0.35 + s2*0.35 + s3*0.30
 
+            # ═══ تعديلات الماركة ═══
             if our_br and c_br:
-                base += 8 if normalize(our_br)==normalize(c_br) else -22
+                base += 10 if normalize(our_br)==normalize(c_br) else -25
             elif our_br and not c_br:
-                # منتجنا له ماركة معروفة لكن المنافس بدون ماركة → خصم كبير
-                base -= 20
+                base -= 25  # منتجنا له ماركة لكن المنافس بدون → خصم كبير
+            elif not our_br and c_br:
+                base -= 25  # العكس
+            elif not our_br and not c_br:
+                # كلاهما بدون ماركة → خصم لأن المطابقة غير موثوقة
+                base -= 10
+
+            # ═══ تعديلات الحجم ═══
             if our_sz > 0 and c_sz > 0:
                 d = abs(our_sz - c_sz)
-                base += 8 if d==0 else (-5 if d<=5 else -15 if d<=20 else -28)
+                base += 10 if d==0 else (-5 if d<=5 else -18 if d<=20 else -30)
             if our_tp and c_tp and our_tp != c_tp: base -= 14
             if our_gd and c_gd and our_gd != c_gd: base -= 20
-            # تطبيق عقوبة خط الإنتاج
+
+            # ═══ تطبيق عقوبة خط الإنتاج ═══
             base += pline_penalty
 
             score = round(max(0, min(100, base)), 1)
@@ -519,12 +576,27 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
     else:
         risk = "🟢 منخفض"
 
-    if override:         dec = override
-    elif src in ("gemini","auto") or score>=HIGH_CONFIDENCE:
-        if diff > PRICE_TOLERANCE:    dec = "🔴 سعر أعلى"
-        elif diff < -PRICE_TOLERANCE: dec = "🟢 سعر أقل"
-        else:                         dec = "✅ موافق"
-    else:                             dec = "⚠️ مراجعة"
+    # ═══ توزيع النتائج على الأقسام ═══
+    # 🔴 سعر أعلى: سعرنا أعلى من المنافس بأكثر من 10 ريال
+    # 🟢 سعر أقل: سعرنا أقل من المنافس بأكثر من 10 ريال
+    # ✅ موافق: سعرنا مناسب (فرق ≤ 10 ريال)
+    # ⚠️ مراجعة: المطابقة غير مؤكدة (ثقة منخفضة)
+    PRICE_DIFF_THRESHOLD = 10  # فرق السعر المقبول بالريال
+    if override:
+        dec = override
+    elif src in ("gemini","auto") or score >= HIGH_CONFIDENCE:
+        # مطابقة مؤكدة → توزيع حسب السعر
+        if our_price > 0 and cp > 0:
+            if diff > PRICE_DIFF_THRESHOLD:     dec = "🔴 سعر أعلى"
+            elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
+            else:                                dec = "✅ موافق"
+        else:
+            dec = "⚠️ مراجعة"  # لا يوجد سعر → مراجعة
+    elif score >= REVIEW_THRESHOLD:
+        # مطابقة محتملة لكن تحتاج تأكيد → تحت المراجعة
+        dec = "⚠️ مراجعة"
+    else:
+        dec = "⚠️ مراجعة"
 
     ai_lbl = {"gemini":f"🤖✅({score:.0f}%)",
               "auto":f"🎯({score:.0f}%)",
