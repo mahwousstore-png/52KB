@@ -104,8 +104,8 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 
     # فلتر نسبة التطابق
     match_min = filters.get("match_min")
-    if match_min and "نسبة التطابق" in result.columns:
-        result = result[result["نسبة التطابق"] >= float(match_min)]
+    if match_min and "نسبة_التطابق" in result.columns:
+        result = result[result["نسبة_التطابق"] >= float(match_min)]
 
     # فلتر أقل سعر
     price_min = filters.get("price_min", 0.0)
