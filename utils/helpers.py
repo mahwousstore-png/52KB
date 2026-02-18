@@ -82,7 +82,7 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     search = filters.get("search", "").strip()
     if search:
         mask = pd.Series([False] * len(result))
-        for col in ["المنتج", "منتج المنافس", "الماركة"]:
+        for col in ["المنتج", "منتج_المنافس", "الماركة"]:
             if col in result.columns:
                 mask = mask | result[col].astype(str).str.contains(search, case=False, na=False)
         result = result[mask]
@@ -127,7 +127,7 @@ def export_to_excel(df: pd.DataFrame, sheet_name: str = "النتائج") -> byt
     export_df = df.copy()
 
     # إزالة الأعمدة غير القابلة للتسلسل
-    for col in ["جميع المنافسين"]:
+    for col in ["جميع المنافسين", "جميع_المنافسين"]:
         if col in export_df.columns:
             export_df = export_df.drop(columns=[col])
 
@@ -152,7 +152,7 @@ def export_multiple_sheets(sheets: Dict[str, pd.DataFrame]) -> bytes:
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         for sheet_name, df in sheets.items():
             export_df = df.copy()
-            for col in ["جميع المنافسين"]:
+            for col in ["جميع المنافسين", "جميع_المنافسين"]:
                 if col in export_df.columns:
                     export_df = export_df.drop(columns=[col])
 
