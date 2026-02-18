@@ -87,11 +87,12 @@ def read_file(f):
     try:
         name = f.name.lower()
         if name.endswith('.csv'):
-            for enc in ['utf-8','utf-8-sig','windows-1256','cp1256','latin-1']:
+            for enc in ['utf-8-sig','utf-8','windows-1256','cp1256','latin-1']:
                 try:
                     f.seek(0)
                     df = pd.read_csv(f, encoding=enc, on_bad_lines='skip')
-                    if len(df) > 0: break
+                    if len(df) > 0 and not df.columns[0].startswith('\ufeff'): 
+                        break
                 except: continue
         elif name.endswith(('.xlsx','.xls')):
             df = pd.read_excel(f)
@@ -481,12 +482,12 @@ def find_missing_products(our_df, comp_dfs):
             seen.add(cn)
             sz = extract_size(cp)
             missing.append({
-                "منتج المنافس": cp, "معرف المنافس": _pid(row,icol),
-                "سعر المنافس": _price(row), "المنافس": cname,
+                "منتج_المنافس": cp, "معرف_المنافس": _pid(row,icol),
+                "سعر_المنافس": _price(row), "المنافس": cname,
                 "الماركة": extract_brand(cp),
                 "الحجم": f"{int(sz)}ml" if sz else "",
                 "النوع": extract_type(cp), "الجنس": extract_gender(cp),
-                "تاريخ الرصد": datetime.now().strftime("%Y-%m-%d"),
+                "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
             })
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 
