@@ -47,10 +47,20 @@ _SYN = {
     "تواليت":"edt","toilette":"edt","toilet":"edt",
     "eau de cologne":"edc","كولون":"edc","cologne":"edc",
     "extrait de parfum":"extrait","parfum extrait":"extrait",
-    "ديور":"dior","شانيل":"chanel","أرماني":"armani","فرساتشي":"versace",
-    "غيرلان":"guerlain","توم فورد":"tom ford","لطافة":"lattafa","لطافه":"lattafa",
+    "ديور":"dior","شانيل":"chanel","شنل":"chanel","أرماني":"armani","ارماني":"armani",
+    "جورجيو ارماني":"armani","فرساتشي":"versace","فيرساتشي":"versace",
+    "غيرلان":"guerlain","توم فورد":"tom ford","تومفورد":"tom ford",
+    "لطافة":"lattafa","لطافه":"lattafa",
     "أجمل":"ajmal","رصاصي":"rasasi","أمواج":"amouage","كريد":"creed",
-    "سوفاج":"sauvage","بلو":"bleu","إيروس":"eros","وان ميليون":"1 million",
+    "ايف سان لوران":"ysl","سان لوران":"ysl","yves saint laurent":"ysl",
+    "غوتشي":"gucci","قوتشي":"gucci","برادا":"prada","برادة":"prada",
+    "بربري":"burberry","بيربري":"burberry","جيفنشي":"givenchy","جفنشي":"givenchy",
+    "كارولينا هيريرا":"carolina herrera","باكو رابان":"paco rabanne",
+    "نارسيسو رودريغيز":"narciso rodriguez","كالفن كلاين":"calvin klein",
+    "هوجو بوس":"hugo boss","فالنتينو":"valentino","بلغاري":"bvlgari",
+    "كارتييه":"cartier","لانكوم":"lancome","جو مالون":"jo malone",
+    "سوفاج":"sauvage","بلو":"bleu","إيروس":"eros","ايروس":"eros",
+    "وان ميليون":"1 million",
     "إنفيكتوس":"invictus","أفينتوس":"aventus","عود":"oud","مسك":"musk",
     " مل":" ml","ملي ":"ml ","ملي":"ml","مل":"ml",
     "أ":"ا","إ":"ا","آ":"ا","ة":"ه","ى":"ي","ؤ":"و","ئ":"ي",
@@ -98,11 +108,50 @@ def read_file(f):
             df = pd.read_excel(f)
         else:
             return None, "صيغة غير مدعومة"
-        df.columns = df.columns.str.strip()
+        # تنظيف أسماء الأعمدة من BOM والمسافات
+        df.columns = df.columns.str.strip().str.replace('\ufeff', '', regex=False)
         df = df.dropna(how='all').reset_index(drop=True)
+        # إذا كانت الأعمدة Unnamed أو أسماء CSS → تخمين ذكي
+        df = _smart_rename_columns(df)
         return df, None
     except Exception as e:
         return None, str(e)
+
+
+def _smart_rename_columns(df):
+    """تخمين ذكي لأسماء الأعمدة إذا كانت غير معروفة (Unnamed أو أسماء CSS)"""
+    cols = list(df.columns)
+    # حالة 1: أعمدة Unnamed (ملف بدون عناوين)
+    unnamed_count = sum(1 for c in cols if str(c).startswith('Unnamed'))
+    # حالة 2: أعمدة CSS (مثل styles_productCard__name)
+    css_count = sum(1 for c in cols if 'style' in str(c).lower() or '__' in str(c))
+    
+    if unnamed_count >= len(cols) - 1 or css_count >= 1:
+        # تحليل المحتوى لتخمين الأعمدة
+        new_cols = {}
+        for col in cols:
+            sample = df[col].dropna().head(20)
+            if sample.empty:
+                continue
+            # تحقق إذا كان العمود يحتوي على أرقام (أسعار)
+            numeric_count = 0
+            for v in sample:
+                try:
+                    float(str(v).replace(',', ''))
+                    numeric_count += 1
+                except:
+                    pass
+            if numeric_count >= len(sample) * 0.7:
+                new_cols[col] = 'السعر'
+            else:
+                # يحتوي على نصوص → اسم المنتج
+                if 'المنتج' not in new_cols.values() and 'اسم المنتج' not in new_cols.values():
+                    new_cols[col] = 'اسم المنتج'
+                else:
+                    new_cols[col] = col  # ابقِ كما هو
+        if new_cols:
+            df = df.rename(columns=new_cols)
+    return df
 
 def normalize(text):
     if not isinstance(text, str): return ""
@@ -159,11 +208,35 @@ def is_tester(t):
 def is_set(t):
     return isinstance(t, str) and any(k in t.lower() for k in SET_KEYWORDS)
 
+def classify_product(name):
+    """تصنيف المنتج حسب AI_COMPARISON_INSTRUCTIONS: retail/tester/set/hair_mist/body_mist/rejected"""
+    if not isinstance(name, str): return "retail"
+    nl = name.lower()
+    if any(w in nl for w in ['sample','عينة','عينه','miniature','مينياتشر','travel size','decant','تقسيم']):
+        return 'rejected'
+    if any(w in nl for w in ['tester','تستر','تيستر','test']):
+        return 'tester'
+    if any(w in nl for w in ['set','سيت','مجموعة','gift','هدية','طقم','coffret']):
+        return 'set'
+    if any(w in nl for w in ['hair','شعر','هير','hair mist']):
+        return 'hair_mist'
+    if any(w in nl for w in ['body','بودي','جسم','body mist','mist']):
+        return 'body_mist'
+    return 'retail'
+
 def _price(row):
     for c in ["السعر","Price","price","سعر","PRICE"]:
         if c in row.index:
             try: return float(str(row[c]).replace(",",""))
             except: pass
+    # احتياطي: ابحث عن أي عمود رقمي يشبه السعر
+    for c in row.index:
+        try:
+            v = float(str(row[c]).replace(",",""))
+            if 1 <= v <= 99999:  # نطاق سعر معقول
+                return v
+        except:
+            pass
     return 0.0
 
 def _pid(row, col):
@@ -349,7 +422,14 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
     cp    = float(best.get("price") or 0)
     score = float(best.get("score") or 0)
     diff  = round(our_price - cp, 2) if (our_price>0 and cp>0) else 0
-    risk  = "🔴 عالي" if abs(diff)>30 else "🟡 متوسط" if abs(diff)>10 else "🟢 منخفض"
+    # نظام الخطورة حسب AI_COMPARISON_INSTRUCTIONS (نسبة مئوية + ثقة)
+    diff_pct = abs((diff / cp) * 100) if cp > 0 else 0
+    if diff_pct > 20 and score >= 85:
+        risk = "🔴 حرج"
+    elif diff_pct > 10 and score >= 75:
+        risk = "🟡 متوسط"
+    else:
+        risk = "🟢 منخفض"
 
     if override:         dec = override
     elif src in ("gemini","auto") or score>=HIGH_CONFIDENCE:
