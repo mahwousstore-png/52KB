@@ -105,7 +105,7 @@ def _run_analysis_background(job_id, our_df, comp_dfs, our_file_name, comp_names
                 upsert_price_history(
                     str(row.get("المنتج", "")),
                     str(row.get("المنافس", "")),
-                    safe_float(row.get("سعر المنافس", 0)),
+                    safe_float(row.get("سعر_المنافس", 0)),
                     safe_float(row.get("السعر", 0)),
                     safe_float(row.get("الفرق", 0)),
                     safe_float(row.get("نسبة_التطابق", 0)),
@@ -194,9 +194,9 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
             with st.spinner("🤖 AI يحلل..."):
                 items = [{
                     "our": str(r.get("المنتج", "")),
-                    "comp": str(r.get("منتج المنافس", "")),
+                    "comp": str(r.get("منتج_المنافس", "")),
                     "our_price": safe_float(r.get("السعر", 0)),
-                    "comp_price": safe_float(r.get("سعر المنافس", 0))
+                    "comp_price": safe_float(r.get("سعر_المنافس", 0))
                 } for _, r in filtered.head(20).iterrows()]
                 res = bulk_verify(items, prefix)
                 st.markdown(f'<div class="ai-box">{res["response"]}</div>',
@@ -232,9 +232,9 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
     # ── الجدول البصري ─────────────────────────
     for idx, row in page_df.iterrows():
         our_name   = str(row.get("المنتج", "—"))
-        comp_name  = str(row.get("منتج المنافس", "—"))
+        comp_name  = str(row.get("منتج_المنافس", "—"))
         our_price  = safe_float(row.get("السعر", 0))
-        comp_price = safe_float(row.get("سعر المنافس", 0))
+        comp_price = safe_float(row.get("سعر_المنافس", 0))
         diff       = safe_float(row.get("الفرق", our_price - comp_price))
         match_pct  = safe_float(row.get("نسبة_التطابق", 0))
         comp_src   = str(row.get("المنافس", ""))
@@ -628,7 +628,7 @@ elif page == "📂 رفع الملفات":
                             if row.get("نسبة_التطابق", 0) > 0:
                                 upsert_price_history(
                                     str(row.get("المنتج","")), str(row.get("المنافس","")),
-                                    safe_float(row.get("سعر المنافس",0)),
+                                    safe_float(row.get("سعر_المنافس",0)),
                                     safe_float(row.get("السعر",0)),
                                     safe_float(row.get("الفرق",0)),
                                     safe_float(row.get("نسبة_التطابق",0)),
@@ -763,8 +763,8 @@ elif page == "🔍 منتجات مفقودة":
                     mime="text/csv", key="miss_csv")
             with cc3:
                 if st.button("📤 إرسال كل لـ Make", key="miss_make_all"):
-                    products = [{"name": str(r.get("منتج المنافس","")),
-                                 "price": safe_float(r.get("سعر المنافس",0)),
+                    products = [{"name": str(r.get("منتج_المنافس","")),
+                                 "price": safe_float(r.get("سعر_المنافس",0)),
                                  "brand": str(r.get("الماركة","")),
                                  "competitor": str(r.get("المنافس",""))}
                                 for _, r in filtered.iterrows()]
@@ -781,8 +781,8 @@ elif page == "🔍 منتجات مفقودة":
             page_df = filtered.iloc[(pn-1)*PAGE_SIZE:pn*PAGE_SIZE]
 
             for idx, row in page_df.iterrows():
-                name   = str(row.get("منتج المنافس", ""))
-                price  = safe_float(row.get("سعر المنافس", 0))
+                name   = str(row.get("منتج_المنافس", ""))
+                price  = safe_float(row.get("سعر_المنافس", 0))
                 brand  = str(row.get("الماركة", ""))
                 comp   = str(row.get("المنافس", ""))
                 size   = row.get("الحجم", "")
@@ -1059,7 +1059,7 @@ elif page == "🤖 الذكاء الصناعي":
                         _r2 = st.session_state.results
                         _all = _r2.get("all", pd.DataFrame())
                         if not _all.empty and len(_all) > 0:
-                            cols = [c for c in ["المنتج","السعر","منتج المنافس","سعر المنافس","القرار"] if c in _all.columns]
+                            cols = [c for c in ["المنتج","السعر","منتج_المنافس","سعر_المنافس","القرار"] if c in _all.columns]
                             if cols:
                                 _ctx_data = "\n\nعينة من بيانات التطبيق:\n" + _all[cols].head(15).to_string(index=False)
                     with st.spinner("🤖 Gemini يحلل..."):
@@ -1210,7 +1210,7 @@ elif page == "🤖 الذكاء الصناعي":
                     _df_sec = st.session_state.results.get("all", pd.DataFrame())
 
                 if _df_sec is not None and not _df_sec.empty:
-                    _cols = [c for c in ["المنتج","السعر","منتج المنافس","سعر المنافس","القرار","الفرق"] if c in _df_sec.columns]
+                    _cols = [c for c in ["المنتج","السعر","منتج_المنافس","سعر_المنافس","القرار","الفرق"] if c in _df_sec.columns]
                     _sample = _df_sec[_cols].head(25).to_string(index=False) if _cols else ""
                     _full_cmd = f"""البيانات ({_cmd_section}) - {len(_df_sec)} منتج:
 {_sample}
