@@ -255,7 +255,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                        else "#FFD600" if match_pct >= 70 else "#FF1744")
         risk_html = ""
         if risk:
-            rc = {"عالي": "#FF1744", "متوسط": "#FFD600", "منخفض": "#00C853"}.get(risk, "#888")
+            rc = {"حرج": "#FF1744", "عالي": "#FF1744", "متوسط": "#FFD600", "منخفض": "#00C853", "عادي": "#00C853"}.get(risk.replace("🔴 ","").replace("🟡 ","").replace("🟢 ",""), "#888")
             risk_html = f'<span style="color:{rc};font-size:.75rem;font-weight:700">⚡{risk}</span>'
 
         # تاريخ آخر تغيير سعر
@@ -283,7 +283,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         </div>""", unsafe_allow_html=True)
 
         # منافسين متعددين
-        all_comps = row.get("جميع المنافسين", [])
+        all_comps = row.get("جميع_المنافسين", row.get("جميع المنافسين", []))
         if isinstance(all_comps, list) and len(all_comps) > 1:
             with st.expander(f"👥 {len(all_comps)} منافس", expanded=False):
                 for cm in all_comps:
@@ -880,7 +880,7 @@ elif page == "🔍 منتجات مفقودة":
                         )
                         st.success(res["message"]) if res["success"] else st.error(res["message"])
 
-                with b5:  # تجاهل
+                with b7:  # تجاهل
                     if st.button("🗑️ تجاهل", key=f"ign_{idx}"):
                         log_decision(name, "missing", "ignored", "تجاهل", 0, price, -price, comp)
                         st.warning("تم")
