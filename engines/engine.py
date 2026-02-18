@@ -33,6 +33,15 @@ except:
         "Dolce & Gabbana","Valentino","Bvlgari","Cartier","Hugo Boss","Calvin Klein",
         "Givenchy","Lancome","Guerlain","Jean Paul Gaultier","Issey Miyake","Davidoff",
         "Coach","Michael Kors","Initio","Memo Paris","Maison Margiela","Diptyque",
+        "Missoni","Juicy Couture","Moschino","Dunhill","Bentley","Jaguar",
+        "Boucheron","Chopard","Elie Saab","Escada","Ferragamo","Fendi",
+        "Kenzo","Lacoste","Loewe","Rochas","Roberto Cavalli","Tiffany",
+        "Van Cleef","Azzaro","Chloe","Elizabeth Arden","Swiss Arabian",
+        "Ard Al Zaafaran","Nabeel","Asdaaf","Maison Alhambra",
+        "لطافة","العربية للعود","رصاصي","أجمل","الحرمين","أرماف",
+        "أمواج","كريد","توم فورد","ديور","شانيل","غوتشي","برادا",
+        "ميسوني","جوسي كوتور","موسكينو","دانهيل","بنتلي",
+        "كينزو","لاكوست","فندي","ايلي صعب","ازارو",
     ]
     WORD_REPLACEMENTS = {}
     MATCH_THRESHOLD = 62; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
@@ -62,6 +71,17 @@ _SYN = {
     "سوفاج":"sauvage","بلو":"bleu","إيروس":"eros","ايروس":"eros",
     "وان ميليون":"1 million",
     "إنفيكتوس":"invictus","أفينتوس":"aventus","عود":"oud","مسك":"musk",
+    "ميسوني":"missoni","جوسي كوتور":"juicy couture","موسكينو":"moschino",
+    "دانهيل":"dunhill","بنتلي":"bentley","كينزو":"kenzo","لاكوست":"lacoste",
+    "فندي":"fendi","ايلي صعب":"elie saab","ازارو":"azzaro",
+    "فيراغامو":"ferragamo","شوبار":"chopard","بوشرون":"boucheron",
+    "لانكم":"lancome","لانكوم":"lancome","جيفنشي":"givenchy","جيفانشي":"givenchy",
+    "بربري":"burberry","بيربري":"burberry","بوربيري":"burberry",
+    "فيرساتشي":"versace","فرزاتشي":"versace",
+    "روبيرتو كفالي":"roberto cavalli","روبرتو كافالي":"roberto cavalli",
+    "سلفاتوري":"ferragamo","سالفاتوري":"ferragamo",
+    "ايف سان لوران":"ysl","ايف سانت لوران":"ysl",
+    "هيرميس":"hermes","ارميس":"hermes","هرمز":"hermes",
     " مل":" ml","ملي ":"ml ","ملي":"ml","مل":"ml",
     "أ":"ا","إ":"ا","آ":"ا","ة":"ه","ى":"ي","ؤ":"و","ئ":"ي",
 }
@@ -199,6 +219,51 @@ def extract_gender(text):
     if w and not m: return "نسائي"
     return ""
 
+def extract_product_line(text, brand=""):
+    """استخراج اسم خط الإنتاج (المنتج الأساسي) بعد إزالة الماركة والكلمات الشائعة.
+    مثال: 'عطر بربري هيرو أو دو تواليت 100مل' → 'هيرو'
+    مثال: 'عطر لندن من بربري للرجال' → 'لندن'
+    هذا ضروري لمنع مطابقة 'بربري هيرو' مع 'بربري لندن'
+    """
+    if not isinstance(text, str): return ""
+    n = text.lower()
+    # إزالة الماركة (عربي + إنجليزي) — كل الأشكال
+    if brand:
+        for b_var in [brand.lower(), normalize(brand)]:
+            n = n.replace(b_var, " ")
+        # إزالة المرادفات العربية لهذه الماركة تحديداً
+        brand_norm = brand.lower()
+        for k, v in _SYN.items():
+            if v == brand_norm or v == normalize(brand):
+                n = n.replace(k, " ")
+    # إزالة حروف الجر المتبقية
+    for prep in ['من','في','لل','ال']:
+        n = re.sub(r'\b' + prep + r'\b', ' ', n)
+    # إزالة الكلمات الشائعة
+    _STOP = [
+        'عطر','تستر','تيستر','tester','perfume','fragrance',
+        'او دو','او دي','أو دو','أو دي',
+        'بارفان','بارفيوم','برفيوم','parfum','edp','eau de parfum',
+        'تواليت','toilette','edt','eau de toilette',
+        'كولون','cologne','edc','eau de cologne',
+        'انتنس','intense','اكستريم','extreme','ابسولو','absolue',
+        'للرجال','للنساء','رجالي','نسائي','للجنسين',
+        'for men','for women','unisex','pour homme','pour femme',
+        'ml','مل','ملي','milliliter',
+        'كرتون ابيض','كرتون أبيض','white box',
+        'اصلي','original','authentic','جديد','new',
+    ]
+    for w in _STOP:
+        n = n.replace(w, ' ')
+    # إزالة الأرقام (الحجم)
+    n = re.sub(r'\d+(?:\.\d+)?', ' ', n)
+    # إزالة الرموز
+    n = re.sub(r'[^\w\s\u0600-\u06FF]', ' ', n)
+    # توحيد الهمزات
+    for k, v in {'أ':'ا','إ':'ا','آ':'ا','ة':'ه','ى':'ي'}.items():
+        n = n.replace(k, v)
+    return re.sub(r'\s+', ' ', n).strip()
+
 def is_sample(t):
     return isinstance(t, str) and any(k in t.lower() for k in REJECT_KEYWORDS)
 
@@ -267,11 +332,13 @@ class CompIndex:
         self.sizes      = [extract_size(n) for n in self.raw_names]
         self.types      = [extract_type(n) for n in self.raw_names]
         self.genders    = [extract_gender(n) for n in self.raw_names]
+        # خطوط الإنتاج — لمنع مطابقة 'بربري هيرو' مع 'بربري لندن'
+        self.plines     = [extract_product_line(n, self.brands[i]) for i, n in enumerate(self.raw_names)]
         self.prices     = [_price(row) for _, row in df.iterrows()]
         self.ids        = [_pid(row, id_col) for _, row in df.iterrows()]
 
-    def search(self, our_norm, our_br, our_sz, our_tp, our_gd, top_n=6):
-        """بحث vectorized بـ rapidfuzz process.extract"""
+    def search(self, our_norm, our_br, our_sz, our_tp, our_gd, our_pline="", top_n=6):
+        """بحث vectorized بـ rapidfuzz process.extract مع مقارنة خط الإنتاج"""
         if not self.norm_names: return []
 
         # استبعاد العينات مسبقاً
@@ -299,6 +366,7 @@ class CompIndex:
             c_sz = self.sizes[idx]
             c_tp = self.types[idx]
             c_gd = self.genders[idx]
+            c_pl = self.plines[idx]
 
             # فلاتر سريعة
             if our_br and c_br and normalize(our_br) != normalize(c_br): continue
@@ -306,6 +374,20 @@ class CompIndex:
             if our_tp and c_tp and our_tp != c_tp:
                 if our_sz > 0 and c_sz > 0 and abs(our_sz - c_sz) > 3: continue
             if our_gd and c_gd and our_gd != c_gd: continue
+
+            # ═══ مقارنة خط الإنتاج (الحل الجذري) ═══
+            # إذا كلا المنتجين لهما ماركة معروفة وخط إنتاج واضح
+            # نقارن خط الإنتاج — إذا مختلف تماماً → رفض
+            pline_penalty = 0
+            if our_pline and c_pl and our_br and c_br:
+                pl_score = fuzz.token_sort_ratio(our_pline, c_pl)
+                if pl_score < 40:
+                    # خطوط إنتاج مختلفة تماماً (هيرو ≠ لندن)
+                    continue  # رفض المطابقة نهائياً
+                elif pl_score < 65:
+                    pline_penalty = -25  # خصم كبير
+                elif pl_score < 80:
+                    pline_penalty = -10  # خصم متوسط
 
             # score تفصيلي
             n1, n2 = our_norm, self.norm_names[idx]
@@ -316,11 +398,16 @@ class CompIndex:
 
             if our_br and c_br:
                 base += 8 if normalize(our_br)==normalize(c_br) else -22
+            elif our_br and not c_br:
+                # منتجنا له ماركة معروفة لكن المنافس بدون ماركة → خصم
+                base -= 15
             if our_sz > 0 and c_sz > 0:
                 d = abs(our_sz - c_sz)
                 base += 8 if d==0 else (-5 if d<=5 else -15 if d<=20 else -28)
             if our_tp and c_tp and our_tp != c_tp: base -= 14
             if our_gd and c_gd and our_gd != c_gd: base -= 20
+            # تطبيق عقوبة خط الإنتاج
+            base += pline_penalty
 
             score = round(max(0, min(100, base)), 1)
             if score < MATCH_THRESHOLD: continue
@@ -511,11 +598,12 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
         ptype   = extract_type(product)
         gender  = extract_gender(product)
         our_n   = normalize(product)
+        our_pl  = extract_product_line(product, brand)
 
         # ── جمع المرشحين من كل الفهارس ──
         all_cands = []
         for idx_obj in indices.values():
-            all_cands.extend(idx_obj.search(our_n, brand, size, ptype, gender, top_n=5))
+            all_cands.extend(idx_obj.search(our_n, brand, size, ptype, gender, our_pline=our_pl, top_n=5))
 
         if not all_cands:
             results.append(_row(product,our_price,our_id,brand,size,ptype,gender,
