@@ -661,7 +661,6 @@ elif page == "🔴 سعر أعلى":
         df = st.session_state.results["price_raise"]
         if not df.empty:
             st.error(f"⚠️ {len(df)} منتج سعرنا أعلى من المنافسين")
-            # AI تدريب لهذا القسم
             with st.expander("🤖 نصيحة AI لهذا القسم", expanded=False):
                 if st.button("📡 احصل على تحليل شامل للقسم", key="ai_section_raise"):
                     with st.spinner("🤖 AI يحلل..."):
@@ -725,14 +724,12 @@ elif page == "🔍 منتجات مفقودة":
         if not df.empty:
             st.warning(f"⚠️ {len(df)} منتج مفقود")
 
-            # AI للقسم
             with st.expander("🤖 نصيحة AI — أولويات الإضافة", expanded=False):
                 if st.button("📡 تحليل المنتجات المفقودة", key="ai_missing_section"):
                     with st.spinner("🤖"):
                         r = call_ai(f"عندي {len(df)} منتج عند المنافسين غير موجود في متجرنا مهووس. أعطني توصيات أولويات الإضافة.", "missing")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
 
-            # فلاتر
             opts = get_filter_options(df)
             with st.expander("🔍 فلاتر", expanded=False):
                 c1, c2, c3 = st.columns(3)
@@ -749,7 +746,6 @@ elif page == "🔍 منتجات مفقودة":
             if comp_f != "الكل" and "المنافس" in filtered.columns:
                 filtered = filtered[filtered["المنافس"].str.contains(comp_f, case=False, na=False)]
 
-            # تصدير
             cc1, cc2, cc3 = st.columns(3)
             with cc1:
                 excel_m = export_to_excel(filtered, "مفقودة")
@@ -773,7 +769,6 @@ elif page == "🔍 منتجات مفقودة":
 
             st.caption(f"{len(filtered)} منتج — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-            # عرض كل منتج
             PAGE_SIZE = 20
             total_p = len(filtered)
             tp = max(1, (total_p + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -806,7 +801,7 @@ elif page == "🔍 منتجات مفقودة":
 
                 b1, b2, b3, b4, b5, b6, b7, b8 = st.columns(8)
 
-                with b1:  # صورة + مكونات
+                with b1:
                     if st.button("🖼️ صورة", key=f"img_{idx}"):
                         with st.spinner("يجلب من Fragrantica Arabia..."):
                             fi = fetch_fragrantica_info(name)
@@ -826,14 +821,14 @@ elif page == "🔍 منتجات مفقودة":
                             else:
                                 st.warning("لم يتم العثور على صورة")
 
-                with b2:  # وصف مهووس
+                with b2:
                     if st.button("✍️ وصف مهووس", key=f"mhdesc_{idx}"):
                         with st.spinner("يولّد الوصف..."):
                             fi2 = fetch_fragrantica_info(name)
                             desc = generate_mahwous_description(name, price, fi2)
                             st.text_area("وصف المنتج — نسخ للمتجر:", desc, height=250, key=f"mhd_ta_{idx}")
 
-                with b3:  # تحقق تكرار AI
+                with b3:
                     if st.button("🤖 تكرار؟", key=f"dup_{idx}"):
                         with st.spinner("..."):
                             our_prods = []
@@ -843,7 +838,7 @@ elif page == "🔍 منتجات مفقودة":
                             r = check_duplicate(name, our_prods[:50])
                             st.info(r["response"][:200] if r["success"] else "فشل")
 
-                with b4:  # بحث في مهووس
+                with b4:
                     if st.button("🔎 مهووس", key=f"mhw_{idx}"):
                         with st.spinner("يبحث في mahwous.com..."):
                             r = search_mahwous(name)
@@ -856,7 +851,7 @@ elif page == "🔍 منتجات مفقودة":
                             else:
                                 st.warning("تعذر البحث")
 
-                with b5:  # بحث سعر السوق
+                with b5:
                     if st.button("💹 سوق", key=f"mkt_m_{idx}"):
                         with st.spinner("🌐 يبحث في السوق..."):
                             r = search_market_price(name, price)
@@ -872,7 +867,7 @@ elif page == "🔍 منتجات مفقودة":
   <div style="color:#aaa;font-size:.82rem;margin-top:6px">{rec}</div>
 </div>""", unsafe_allow_html=True)
 
-                with b6:  # إضافة للـ Make
+                with b6:
                     if st.button("📤 Make", key=f"mk_m_{idx}"):
                         res = send_single_product(
                             {"name": name, "price": price, "brand": brand, "competitor": comp},
@@ -880,7 +875,7 @@ elif page == "🔍 منتجات مفقودة":
                         )
                         st.success(res["message"]) if res["success"] else st.error(res["message"])
 
-                with b7:  # تجاهل
+                with b7:
                     if st.button("🗑️ تجاهل", key=f"ign_{idx}"):
                         log_decision(name, "missing", "ignored", "تجاهل", 0, price, -price, comp)
                         st.warning("تم")
@@ -921,7 +916,6 @@ elif page == "⚠️ تحت المراجعة":
 elif page == "🤖 الذكاء الصناعي":
     db_log("ai", "view")
 
-    # ── شريط الحالة ──
     if GEMINI_API_KEYS:
         st.markdown(f'''<div style="background:linear-gradient(90deg,#051505,#030d1f);
             border:1px solid #00C853;border-radius:10px;padding:10px 18px;
@@ -934,7 +928,6 @@ elif page == "🤖 الذكاء الصناعي":
     else:
         st.error("❌ Gemini غير متصل — أضف GEMINI_API_KEYS في Streamlit Secrets")
 
-    # ── سياق البيانات ──
     _ctx = []
     if st.session_state.results:
         _r = st.session_state.results
@@ -952,11 +945,9 @@ elif page == "🤖 الذكاء الصناعي":
         "💬 دردشة مباشرة", "📋 لصق وتحليل", "🔍 تحقق منتج", "💹 بحث سوق", "📊 أوامر مجمعة"
     ])
 
-    # ═══ TAB 1: دردشة Gemini مباشرة ═══════════
     with tab1:
         st.caption(f"📊 البيانات: {_ctx_str}")
 
-        # صندوق المحادثة
         _chat_h = 430
         _msgs_html = ""
         if not st.session_state.chat_history:
@@ -991,7 +982,6 @@ elif page == "🤖 الذكاء الصناعي":
               {_msgs_html}
             </div>''', unsafe_allow_html=True)
 
-        # إدخال
         _mc1, _mc2 = st.columns([5, 1])
         with _mc1:
             _user_in = st.text_input("", key="gem_in",
@@ -1000,7 +990,6 @@ elif page == "🤖 الذكاء الصناعي":
         with _mc2:
             _send = st.button("➤ إرسال", key="gem_send", type="primary", use_container_width=True)
 
-        # أزرار سريعة
         _qc = st.columns(4)
         _quick = None
         _quick_labels = [
@@ -1036,7 +1025,6 @@ elif page == "🤖 الذكاء الصناعي":
                     st.session_state.chat_history = []
                     st.rerun()
 
-    # ═══ TAB 2: لصق وتحليل ══════════════════════
     with tab2:
         st.markdown("**الصق منتجات أو بيانات أو أوامر — Gemini سيحللها فوراً:**")
 
@@ -1053,7 +1041,6 @@ elif page == "🤖 الذكاء الصناعي":
         with _pc1:
             if st.button("🤖 تحليل بـ Gemini", key="paste_go", type="primary", use_container_width=True):
                 if _paste:
-                    # إضافة سياق البيانات الحالية
                     _ctx_data = ""
                     if st.session_state.results:
                         _r2 = st.session_state.results
@@ -1078,7 +1065,6 @@ elif page == "🤖 الذكاء الصناعي":
                     except:
                         st.warning("تعذر التحويل لجدول — جرب تنسيق CSV أو TSV")
 
-    # ═══ TAB 3: تحقق منتج ══════════════════════
     with tab3:
         st.markdown("**تحقق من تطابق منتجين بدقة 100%:**")
         _vc1, _vc2 = st.columns(2)
@@ -1105,7 +1091,6 @@ elif page == "🤖 الذكاء الصناعي":
                 else:
                     st.error("فشل الاتصال")
 
-    # ═══ TAB 4: بحث السوق ══════════════════════
     with tab4:
         st.markdown("**ابحث عن سعر السوق الحقيقي لأي منتج:**")
         _ms1, _ms2 = st.columns([3,1])
@@ -1148,7 +1133,6 @@ elif page == "🤖 الذكاء الصناعي":
                     if _rec:
                         st.markdown(f'<div class="ai-box">💡 {_rec}</div>', unsafe_allow_html=True)
 
-        # صورة المنتج من Fragrantica
         with st.expander("🖼️ صورة ومكونات من Fragrantica Arabia", expanded=False):
             _fprod = st.text_input("اسم العطر:", key="frag_prod",
                                     placeholder="Dior Sauvage EDP")
@@ -1162,8 +1146,6 @@ elif page == "🤖 الذكاء الصناعي":
                             _img_url = _fi.get("image_url","")
                             if _img_url and _img_url.startswith("http"):
                                 st.image(_img_url, width=200, caption=_fprod)
-                            else:
-                                st.markdown(f"[🔗 Fragrantica Arabia]({_FR}/search/?query={_fprod.replace(' ','+')})")
                         with _fic2:
                             _top = ", ".join(_fi.get("top_notes",[])[:5])
                             _mid = ", ".join(_fi.get("middle_notes",[])[:5])
@@ -1178,7 +1160,6 @@ elif page == "🤖 الذكاء الصناعي":
                     else:
                         st.info("لم يتم العثور على بيانات — تحقق من اسم العطر")
 
-    # ═══ TAB 5: أوامر مجمعة ════════════════════
     with tab5:
         st.markdown("**نفّذ أوامر مجمعة على بياناتك:**")
         st.caption(f"📊 البيانات: {_ctx_str}")
