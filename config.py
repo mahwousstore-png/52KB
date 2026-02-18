@@ -123,7 +123,7 @@ COLORS = {
 # ══════════════════════════════════════════════
 #  إعدادات المطابقة
 # ══════════════════════════════════════════════
-MATCH_THRESHOLD    = 60
+MATCH_THRESHOLD    = 68
 HIGH_CONFIDENCE    = 92
 REVIEW_THRESHOLD   = 75
 PRICE_TOLERANCE    = 5
