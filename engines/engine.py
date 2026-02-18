@@ -43,6 +43,17 @@ except:
         "Frederic Malle","Ormonde Jayne","Zoologist","Tauer",
         "Banana Republic","Benetton","Bottega Veneta","Celine","Dsquared2",
         "Ermenegildo Zegna","Sisley","Mexx","Amadou","Thameen",
+        "Nasomatto","Nicolai","Replica","Atelier Cologne","Aerin",
+        "Angel Schlesser","Annick Goutal","Antonio Banderas","Balenciaga",
+        "Bond No 9","Boadicea","Carner Barcelona","Clean","Commodity",
+        "Costume National","Creed","Derek Lam","Diptique","Estee Lauder",
+        "Franck Olivier","Giorgio Beverly Hills","Guerlain","Guess",
+        "Histoires de Parfums","Illuminum","Jimmy Choo","Kenneth Cole",
+        "Lalique","Lolita Lempicka","Lubin","Miu Miu","Moresque",
+        "Nobile 1942","Oscar de la Renta","Oud Elite","Philipp Plein",
+        "Police","Prada","Rasasi","Reminiscence","Salvatore Ferragamo",
+        "Stella McCartney","Ted Lapidus","Ungaro","Vera Wang","Viktor Rolf",
+        "Zadig Voltaire","Zegna","Ajwad","Club de Nuit","Milestone",
         "لطافة","العربية للعود","رصاسي","أجمل","الحرمين","أرماف",
         "أمواج","كريد","توم فورد","ديور","شانيل","غوتشي","برادا",
         "ميسوني","جوسي كوتور","موسكينو","دانهيل","بنتلي",
@@ -51,6 +62,8 @@ except:
         "تيزيانا ترينزي","مايزون فرانسيس","بايريدو","لي لابو",
         "مانسيرا","مونتالي","روجا","جو مالون","ثمين","أمادو",
         "ناسوماتو","ميزون مارجيلا","نيكولاي",
+        "جيمي تشو","لاليك","بوليس","فيكتور رولف",
+        "كلوي","بالنسياغا","ميو ميو",
     ]
     WORD_REPLACEMENTS = {}
     MATCH_THRESHOLD = 68; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
@@ -107,6 +120,25 @@ _SYN = {
     "جو مالون":"jo malone","جومالون":"jo malone",
     "ثمين":"thameen","أمادو":"amadou","امادو":"amadou",
     "انيشيو":"initio","إنيشيو":"initio","initio":"initio",
+    "جيمي تشو":"jimmy choo","جيميتشو":"jimmy choo",
+    "لاليك":"lalique","بوليس":"police",
+    "فيكتور رولف":"viktor rolf","فيكتور اند رولف":"viktor rolf",
+    "كلوي":"chloe","شلوي":"chloe",
+    "بالنسياغا":"balenciaga","بالنسياجا":"balenciaga",
+    "ميو ميو":"miu miu",
+    "استي لودر":"estee lauder","استيلودر":"estee lauder",
+    "كوتش":"coach","مايكل كورس":"michael kors",
+    "رالف لورين":"ralph lauren","رالف لوران":"ralph lauren",
+    "ايزي مياكي":"issey miyake","ايسي مياكي":"issey miyake",
+    "دافيدوف":"davidoff","ديفيدوف":"davidoff",
+    "دولشي اند غابانا":"dolce gabbana","دولتشي":"dolce gabbana","دولشي":"dolce gabbana",
+    "جان بول غولتييه":"jean paul gaultier","غولتييه":"jean paul gaultier","غولتيه":"jean paul gaultier",
+    "غوتييه":"jean paul gaultier","جان بول غوتييه":"jean paul gaultier","قوتييه":"jean paul gaultier","قولتييه":"jean paul gaultier",
+    "مونت بلانك":"montblanc","مونتبلان":"montblanc",
+    "موجلر":"mugler","موغلر":"mugler","تييري موجلر":"mugler",
+    "كلوب دي نوي":"club de nuit","كلوب دنوي":"club de nuit",
+    "مايلستون":"milestone",
+    "سكاندل":"scandal","سكاندال":"scandal",
     " مل":" ml","ملي ":"ml ","ملي":"ml","مل":"ml",
     "أ":"ا","إ":"ا","آ":"ا","ة":"ه","ى":"ي","ؤ":"و","ئ":"ي",
 }
@@ -141,6 +173,7 @@ _init_db()
 def read_file(f):
     try:
         name = f.name.lower()
+        df = None
         if name.endswith('.csv'):
             for enc in ['utf-8-sig','utf-8','windows-1256','cp1256','latin-1']:
                 try:
@@ -149,6 +182,8 @@ def read_file(f):
                     if len(df) > 0 and not df.columns[0].startswith('\ufeff'): 
                         break
                 except: continue
+            if df is None:
+                return None, "فشل قراءة الملف بجميع الترميزات"
         elif name.endswith(('.xlsx','.xls')):
             df = pd.read_excel(f)
         else:
@@ -238,8 +273,8 @@ def extract_type(text):
 def extract_gender(text):
     if not isinstance(text, str): return ""
     tl = text.lower()
-    m = any(k in tl for k in ["pour homme","for men"," men ","رجالي","للرجال"])
-    w = any(k in tl for k in ["pour femme","for women","women","نسائي","للنساء","lady"])
+    m = any(k in tl for k in ["pour homme","for men"," men "," man ","رجالي","للرجال"," مان "," هوم ","homme"," uomo"])
+    w = any(k in tl for k in ["pour femme","for women","women"," woman ","نسائي","للنساء","النسائي","lady","femme"," donna"])
     if m and not w: return "رجالي"
     if w and not m: return "نسائي"
     return ""
@@ -271,9 +306,10 @@ def extract_product_line(text, brand=""):
         'بارفان','بارفيوم','برفيوم','بيرفيوم','برفان','parfum','edp','eau de parfum',
         'تواليت','toilette','edt','eau de toilette',
         'كولون','cologne','edc','eau de cologne',
-        'انتنس','انتينس','intense','اكستريم','extreme','ابسولو','absolue',
+        'انتنس','انتينس','intense','اكستريم','extreme',
+        'ابسولو','ابسوليو','absolue','absolute','absolu',
         'اكستريت','اكسترايت','extrait','extract',
-        'دو','de','du',
+        'دو','de','du','la','le','les','the',
         # أسماء ماركات فرعية تبقى بعد إزالة الماركة الرئيسية
         'تيرينزي','ترينزي','terenzi','terenzio',  # Tiziana Terenzi
         'كوركدجيان','كركدجيان','kurkdjian',  # MFK
@@ -285,12 +321,40 @@ def extract_product_line(text, brand=""):
         'ml','مل','ملي','milliliter',
         'كرتون ابيض','كرتون أبيض','white box',
         'اصلي','original','authentic','جديد','new',
-        'اصدار','اصدارات','edition',  # إضافة جديدة
+        'اصدار','اصدارات','edition','limited',
+        # كلمات شائعة ترفع pl_score خطأً
+        'برفان','spray','بخاخ','عطور',
+        'الرجالي','النسائي','رجال','نساء',
+        'men','women','homme','femme',
+        'مان','man','uomo','donna',
+        'هوم','فيم',
+        'او','ou','or','و',
+        # كلمات إضافية ترفع pl_score خطأً
+        'لو','لا','lo',
+        'di','دي',
+        # أجزاء أسماء الماركات المركبة التي تبقى بعد إزالة المرادف
+        'جان','بول','jean','paul','gaultier',
+        'كارولينا','هيريرا','carolina','herrera',
+        'دولشي','غابانا','dolce','gabbana',
+        'رالف','لورين','ralph','lauren',
+        'ايزي','مياكي','issey','miyake',
+        'فان','كليف','van','cleef','arpels',
+        'اورمند','جايان','ormonde','jayne',
+        'توماس','كوسمالا','thomas','kosmala',
+        'فرانسيس','francis',
+        'روسيندو','ماتيو','rosendo','mateu',
+        'نيكولاي','nicolai',
+        'ارماف','armaf',
     ]
+    # إزالة الكلمات الطويلة (4+ حروف) بـ replace عادي
+    # والكلمات القصيرة (1-3 حروف) بـ word boundary لمنع حذف أجزاء من كلمات أخرى
     for w in _STOP:
-        n = n.replace(w, ' ')
-    # إزالة الأرقام (الحجم)
-    n = re.sub(r'\d+(?:\.\d+)?', ' ', n)
+        if len(w) <= 3:
+            n = re.sub(r'(?:^|\s)' + re.escape(w) + r'(?:\s|$)', ' ', n)
+        else:
+            n = n.replace(w, ' ')
+    # إزالة الأرقام (الحجم) + مل/ml الملتصقة
+    n = re.sub(r'\d+(?:\.\d+)?\s*(?:ml|مل|ملي)?', ' ', n)
     # إزالة الرموز
     n = re.sub(r'[^\w\s\u0600-\u06FF]', ' ', n)
     # توحيد الهمزات
@@ -313,14 +377,19 @@ def classify_product(name):
     nl = name.lower()
     if any(w in nl for w in ['sample','عينة','عينه','miniature','مينياتشر','travel size','decant','تقسيم']):
         return 'rejected'
-    if any(w in nl for w in ['tester','تستر','تيستر','test']):
+    if any(w in nl for w in ['tester','تستر','تيستر']):
         return 'tester'
-    if any(w in nl for w in ['set','سيت','مجموعة','gift','هدية','طقم','coffret']):
+    if any(w in nl for w in ['set ','سيت','مجموعة','gift','هدية','طقم','coffret']):
         return 'set'
-    if any(w in nl for w in ['hair','شعر','هير','hair mist']):
+    # hair mist: كلمات كاملة فقط (لتجنب "هيريرا" → hair_mist)
+    if re.search(r'\bhair\s*mist\b|عطر\s*شعر|معطر\s*شعر|للشعر|\bhair\b', nl):
         return 'hair_mist'
-    if any(w in nl for w in ['body','بودي','جسم','body mist','mist']):
+    # body mist: كلمات كاملة فقط
+    if re.search(r'\bbody\s*mist\b|بودي\s*مست|بخاخ\s*جسم|معطر\s*جسم|\bbody\s*spray\b', nl):
         return 'body_mist'
+    # بودرة/كريم/لوشن
+    if re.search(r'بودرة|بودره|powder|كريم|cream|لوشن|lotion|ديودرنت|deodorant', nl):
+        return 'other'
     return 'retail'
 
 def _price(row):
@@ -413,10 +482,58 @@ class CompIndex:
             our_class = classify_product(our_norm)
             c_class = classify_product(name)
             if our_class != c_class:
-                # معطر شعر ≠ عطر عادي، تستر ≠ retail، مجموعة ≠ مفرد
-                if our_class in ('hair_mist','body_mist','set','rejected') or \
-                   c_class in ('hair_mist','body_mist','set','rejected'):
+                # العينات تُستثنى تماماً
+                if our_class == 'rejected' or c_class == 'rejected':
                     continue
+                # المجموعات ومعطرات الشعر/الجسم لا تقارن مع العطور
+                if our_class in ('hair_mist','body_mist','set','other') or \
+                   c_class in ('hair_mist','body_mist','set','other'):
+                    continue
+                # التستر يقارن فقط مع التستر، العطر الأساسي فقط مع الأساسي
+                if (our_class == 'tester') != (c_class == 'tester'):
+                    continue
+
+            # ═══ مقارنة الأرقام في أسماء المنتجات (نمبر 11 ≠ نمبر 10) ═══
+            _NUM_WORDS = {
+                'ون':'1','تو':'2','ثري':'3','فور':'4','فايف':'5',
+                'سكس':'6','سفن':'7','ايت':'8','ناين':'9','تن':'10',
+                'one':'1','two':'2','three':'3','four':'4','five':'5',
+                'six':'6','seven':'7','eight':'8','nine':'9','ten':'10',
+                'i':'1','ii':'2','iii':'3','iv':'4','v':'5',
+                'vi':'6','vii':'7','viii':'8','ix':'9','x':'10',
+            }
+            def _extract_product_numbers(text):
+                """Extract product-identifying numbers (not sizes)"""
+                nums = set()
+                # استخراج الأرقام الرقمية
+                for m in re.finditer(r'(?:no|num|number|نمبر|رقم|№|#)\s*(\d+)', text.lower()):
+                    nums.add(m.group(1))
+                # استخراج الأرقام النصية (ون، تو، سفن...)
+                tl = text.lower()
+                for word, num in _NUM_WORDS.items():
+                    if f'نمبر {word}' in tl or f'number {word}' in tl or f'no {word}' in tl or f'رقم {word}' in tl:
+                        nums.add(num)
+                # استخراج أرقام ملتصقة بكلمات (مثل سفن7)
+                for m in re.finditer(r'[a-z؀-ۿ](\d+)', text.lower()):
+                    v = m.group(1)
+                    if v not in {'100','50','30','200','150','75','80','125','250','300','ml'}:
+                        nums.add(v)
+                # أرقام مستقلة ليست أحجام (مثل 212, 360, 9)
+                for m in re.finditer(r'\b(\d{1,3})\b', text.lower()):
+                    v = m.group(1)
+                    # استثناء الأحجام الشائعة فقط إذا كانت متبوعة بـ ml/مل
+                    pos = m.end()
+                    after = text.lower()[pos:pos+5].strip()
+                    if after.startswith('ml') or after.startswith('مل'):
+                        continue  # هذا حجم
+                    if v in {'212','360','1','2','3','4','5','6','7','8','9','11','12','13','14','15','16','17','18','19','21'}:
+                        nums.add(v)
+                return nums
+
+            our_pnums = _extract_product_numbers(our_norm)
+            c_pnums = _extract_product_numbers(self.norm_names[idx])
+            if our_pnums and c_pnums and our_pnums != c_pnums:
+                continue
 
             # ═══ مقارنة خط الإنتاج (الحل الجذري) ═══
             pline_penalty = 0
@@ -424,19 +541,19 @@ class CompIndex:
                 pl_score = fuzz.token_sort_ratio(our_pline, c_pl)
                 if our_br and c_br:
                     # نفس الماركة → مقارنة خط الإنتاج صارمة جداً
-                    # باروندا≠باردون(67%), عنبر≠روز(67%), ربليكا باربرز≠فاير(65%)
-                    # عود مود سليك=عود سيلك مود(73%) → يُقبل
-                    if pl_score < 70:
+                    # باروندا≠باردون(77%), الاباي≠اسبريت(75%)
+                    # سوفاج=سوفاج(100%), عود مود=عود سيلك مود(85%)
+                    if pl_score < 78:
                         continue  # رفض نهائي - خطوط إنتاج مختلفة
-                    elif pl_score < 80:
-                        pline_penalty = -20
                     elif pl_score < 88:
+                        pline_penalty = -20
+                    elif pl_score < 94:
                         pline_penalty = -10
                 else:
                     # ماركات مختلفة أو غير معروفة → مقارنة أكثر صرامة
-                    if pl_score < 55:
+                    if pl_score < 65:
                         pline_penalty = -35
-                    elif pl_score < 75:
+                    elif pl_score < 80:
                         pline_penalty = -22
 
             # ═══ score تفصيلي ═══
@@ -462,7 +579,10 @@ class CompIndex:
                 d = abs(our_sz - c_sz)
                 base += 10 if d==0 else (-5 if d<=5 else -18 if d<=20 else -30)
             if our_tp and c_tp and our_tp != c_tp: base -= 14
-            if our_gd and c_gd and our_gd != c_gd: base -= 20
+            if our_gd and c_gd and our_gd != c_gd:
+                continue  # رفض نهائي - رجالي ≠ نسائي
+            elif (our_gd or c_gd) and our_gd != c_gd:
+                base -= 15  # أحدهما محدد والآخر فارغ
 
             # ═══ تطبيق عقوبة خط الإنتاج ═══
             base += pline_penalty
