@@ -101,14 +101,14 @@ def _run_analysis_background(job_id, our_df, comp_dfs, our_file_name, comp_names
                                         progress_callback=progress_cb)
         # حفظ تاريخ الأسعار
         for _, row in analysis_df.iterrows():
-            if row.get("نسبة التطابق", 0) > 0:
+            if row.get("نسبة_التطابق", 0) > 0:
                 upsert_price_history(
                     str(row.get("المنتج", "")),
                     str(row.get("المنافس", "")),
                     safe_float(row.get("سعر المنافس", 0)),
                     safe_float(row.get("السعر", 0)),
                     safe_float(row.get("الفرق", 0)),
-                    safe_float(row.get("نسبة التطابق", 0)),
+                    safe_float(row.get("نسبة_التطابق", 0)),
                     str(row.get("القرار", ""))
                 )
 
@@ -125,7 +125,7 @@ def _run_analysis_background(job_id, our_df, comp_dfs, our_file_name, comp_names
                           analysis_df.to_dict("records"),
                           "done", our_file_name, comp_names)
         log_analysis(our_file_name, comp_names, total,
-                     len(analysis_df[analysis_df["نسبة التطابق"] > 0]),
+                     len(analysis_df[analysis_df["نسبة_التطابق"] > 0]),
                      len(missing_df))
 
     except Exception as e:
@@ -236,7 +236,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         our_price  = safe_float(row.get("السعر", 0))
         comp_price = safe_float(row.get("سعر المنافس", 0))
         diff       = safe_float(row.get("الفرق", our_price - comp_price))
-        match_pct  = safe_float(row.get("نسبة التطابق", 0))
+        match_pct  = safe_float(row.get("نسبة_التطابق", 0))
         comp_src   = str(row.get("المنافس", ""))
         brand      = str(row.get("الماركة", ""))
         size       = row.get("الحجم", "")
@@ -625,13 +625,13 @@ elif page == "📂 رفع الملفات":
                         missing_df = find_missing_products(our_df, comp_dfs)
 
                         for _, row in df_all.iterrows():
-                            if row.get("نسبة التطابق", 0) > 0:
+                            if row.get("نسبة_التطابق", 0) > 0:
                                 upsert_price_history(
                                     str(row.get("المنتج","")), str(row.get("المنافس","")),
                                     safe_float(row.get("سعر المنافس",0)),
                                     safe_float(row.get("السعر",0)),
                                     safe_float(row.get("الفرق",0)),
-                                    safe_float(row.get("نسبة التطابق",0)),
+                                    safe_float(row.get("نسبة_التطابق",0)),
                                     str(row.get("القرار",""))
                                 )
 
@@ -644,7 +644,7 @@ elif page == "📂 رفع الملفات":
                         }
                         st.session_state.analysis_df = df_all
                         log_analysis(our_file.name, comp_names, len(our_df),
-                                     len(df_all[df_all["نسبة التطابق"]>0]), len(missing_df))
+                                     len(df_all[df_all["نسبة_التطابق"]>0]), len(missing_df))
                         prog.progress(1.0, "✅ اكتمل!")
                         st.balloons()
         else:
