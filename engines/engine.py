@@ -116,8 +116,14 @@ def normalize(text):
 
 def extract_size(text):
     if not isinstance(text, str): return 0.0
-    m = re.findall(r'(\d+(?:\.\d+)?)\s*(?:ml|مل|ملي)', text.lower())
-    return float(m[0]) if m else 0.0
+    tl = text.lower()
+    # البحث عن oz أولاً وتحويله لـ ml
+    oz = re.findall(r'(\d+(?:\.\d+)?)\s*(?:oz|ounce)', tl)
+    if oz:
+        return float(oz[0]) * 29.5735  # 1 oz = 29.5735 ml
+    # البحث عن ml
+    ml = re.findall(r'(\d+(?:\.\d+)?)\s*(?:ml|مل|ملي|milliliter)', tl)
+    return float(ml[0]) if ml else 0.0
 
 def extract_brand(text):
     if not isinstance(text, str): return ""
