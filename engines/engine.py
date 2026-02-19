@@ -66,7 +66,7 @@ except:
         "كلوي","بالنسياغا","ميو ميو",
     ]
     WORD_REPLACEMENTS = {}
-    MATCH_THRESHOLD = 68; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
+    MATCH_THRESHOLD = 85; HIGH_CONFIDENCE = 95; REVIEW_THRESHOLD = 75
     PRICE_TOLERANCE = 5; TESTER_KEYWORDS = ["tester","تستر"]; SET_KEYWORDS = ["set","طقم","مجموعة"]
     GEMINI_API_KEYS = []
 
@@ -972,7 +972,7 @@ def find_missing_products(our_df, comp_dfs):
             # ── بحث أفضل 3 مطابقات ──────────────────
             # عند عدم وجود ماركة → cutoff أعلى لتجنب مطابقة كلمات عامة (عطر، مل، 100)
             _cutoff = 75 if no_brand else 55
-            _req_score = 88 if no_brand else 70  # يجب أن يكون effective_score أعلى من هذا
+            _req_score = 88 if no_brand else 85  # يجب أن يكون effective_score أعلى من هذا
 
             if not cand_norms:
                 # لا يوجد منتجات بهذه الماركة → مفقود مؤكد

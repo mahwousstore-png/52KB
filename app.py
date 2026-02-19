@@ -557,7 +557,7 @@ if page == "📊 لوحة التحكم":
         st.markdown("#### 🔔 تغييرات أسعار آخر 7 أيام")
         c_df = pd.DataFrame(changes)
         st.dataframe(c_df[["product_name","competitor","old_price","new_price",
-                            "price_diff","new_date"]].rename(columns={
+                            "price_diff","new_date"]].head(200).rename(columns={
             "product_name": "المنتج", "competitor": "المنافس",
             "old_price": "السعر السابق", "new_price": "السعر الجديد",
             "price_diff": "التغيير", "new_date": "التاريخ"
@@ -1408,7 +1408,7 @@ elif page == "🤖 الذكاء الصناعي":
                     try:
                         import io as _io
                         _df_p = pd.read_csv(_io.StringIO(_paste), sep=None, engine='python')
-                        st.dataframe(_df_p, use_container_width=True)
+                        st.dataframe(_df_p.head(200), use_container_width=True)
                         _csv_p = _df_p.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                         st.download_button("📄 تحميل CSV", data=_csv_p,
                             file_name="pasted.csv", mime="text/csv", key="paste_dl")
@@ -1611,7 +1611,7 @@ elif page == "⚡ أتمتة Make":
                  "وقت القرار": v.get("ts",""), "المنافس": v.get("competitor","")}
                 for k, v in pending.items()
             ])
-            st.dataframe(df_p, use_container_width=True)
+            st.dataframe(df_p.head(200), use_container_width=True)
 
             c1, c2 = st.columns(2)
             with c1:
@@ -1663,7 +1663,7 @@ elif page == "⚙️ الإعدادات":
         if decisions:
             df_dec = pd.DataFrame(decisions)
             st.dataframe(df_dec[["timestamp","product_name","old_status",
-                                  "new_status","reason","competitor"]].rename(columns={
+                                  "new_status","reason","competitor"]].head(200).rename(columns={
                 "timestamp":"التاريخ","product_name":"المنتج",
                 "old_status":"من","new_status":"إلى",
                 "reason":"السبب","competitor":"المنافس"
@@ -1686,7 +1686,7 @@ elif page == "📜 السجل":
         if history:
             df_h = pd.DataFrame(history)
             st.dataframe(df_h[["timestamp","our_file","comp_file",
-                                "total_products","matched","missing"]].rename(columns={
+                                "total_products","matched","missing"]].head(200).rename(columns={
                 "timestamp":"التاريخ","our_file":"ملف منتجاتنا",
                 "comp_file":"ملف المنافس","total_products":"الإجمالي",
                 "matched":"متطابق","missing":"مفقود"
@@ -1699,7 +1699,7 @@ elif page == "📜 السجل":
         changes = get_price_changes(days)
         if changes:
             df_c = pd.DataFrame(changes)
-            st.dataframe(df_c.rename(columns={
+            st.dataframe(df_c.head(200).rename(columns={
                 "product_name":"المنتج","competitor":"المنافس",
                 "old_price":"السعر السابق","new_price":"السعر الجديد",
                 "price_diff":"التغيير","new_date":"تاريخ التغيير"
@@ -1711,7 +1711,7 @@ elif page == "📜 السجل":
         events = get_events(limit=50)
         if events:
             df_e = pd.DataFrame(events)
-            st.dataframe(df_e[["timestamp","page","event_type","details"]].rename(columns={
+            st.dataframe(df_e[["timestamp","page","event_type","details"]].head(200).rename(columns={
                 "timestamp":"التاريخ","page":"الصفحة",
                 "event_type":"الحدث","details":"التفاصيل"
             }), use_container_width=True)
