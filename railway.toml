@@ -1,8 +1,9 @@
 [build]
-builder = "nixpacks"
+# استخدام Dockerfile بدل Railpack/Nixpacks لتجنب مشكلة secrets أثناء البناء
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

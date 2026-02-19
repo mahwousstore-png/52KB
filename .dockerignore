@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+.git/
+.gitignore
+.streamlit/secrets.toml
+.env
+*.log
+*.md
+mise.toml
+.python-version

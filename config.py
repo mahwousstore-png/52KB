@@ -1,8 +1,9 @@
 """
-config.py - الإعدادات المركزية v19.0
-المفاتيح محمية عبر Streamlit Secrets
+config.py - الإعدادات المركزية v22.0
+المفاتيح محمية عبر Streamlit Secrets + Environment Variables
+تحميل كسول (lazy) — لا يحاول الوصول لـ secrets أثناء البناء
 """
-import streamlit as st
+import os as _os
 import json as _json
 
 # ===== معلومات التطبيق =====
@@ -13,34 +14,39 @@ APP_ICON    = "🧪"
 GEMINI_MODEL = "gemini-2.0-flash"
 
 # ══════════════════════════════════════════════
-#  قراءة Secrets بطريقة آمنة 100%
-#  تدعم 3 أساليب Streamlit
+#  قراءة Secrets بطريقة آمنة — lazy loading
 # ══════════════════════════════════════════════
 def _s(key, default=""):
     """
-    يقرأ Secret بـ 3 طرق:
-    1. st.secrets[key]         الطريقة المباشرة
-    2. st.secrets.get(key)     الطريقة الاحتياطية
-    3. os.environ              للتطوير المحلي
+    يقرأ Secret بـ 3 طرق (لا يفشل أثناء البناء):
+    1. os.environ               أولاً (Railway يضخ المتغيرات كـ env vars)
+    2. st.secrets[key]          الطريقة المباشرة Streamlit
+    3. st.secrets.get(key)      الطريقة الاحتياطية
     """
-    import os
-    # 1. st.secrets dict-style
+    # 1. Environment variable — يعمل دائماً حتى أثناء البناء
+    v = _os.environ.get(key, "")
+    if v:
+        return v
+
+    # 2 & 3. Streamlit secrets — فقط إذا كان streamlit محمّلاً
     try:
-        v = st.secrets[key]
-        if v is not None:
-            return str(v) if not isinstance(v, (list, dict)) else v
+        import streamlit as st
+        try:
+            v = st.secrets[key]
+            if v is not None:
+                return str(v) if not isinstance(v, (list, dict)) else v
+        except Exception:
+            pass
+        try:
+            v = st.secrets.get(key)
+            if v is not None:
+                return str(v) if not isinstance(v, (list, dict)) else v
+        except Exception:
+            pass
     except Exception:
         pass
-    # 2. st.secrets.get
-    try:
-        v = st.secrets.get(key)
-        if v is not None:
-            return str(v) if not isinstance(v, (list, dict)) else v
-    except Exception:
-        pass
-    # 3. Environment variable
-    v = os.environ.get(key, "")
-    return v if v else default
+
+    return default
 
 
 def _parse_gemini_keys():
@@ -57,18 +63,15 @@ def _parse_gemini_keys():
     raw = _s("GEMINI_API_KEYS", "")
 
     if isinstance(raw, list):
-        # TOML array مباشرة
         keys = [k for k in raw if k and isinstance(k, str)]
     elif raw and isinstance(raw, str):
         raw = raw.strip()
-        # قد تكون JSON string
         if raw.startswith('['):
             try:
                 parsed = _json.loads(raw)
                 if isinstance(parsed, list):
                     keys = [k for k in parsed if k]
             except Exception:
-                # ربما string بدون quotes صحيحة → نظفها
                 clean = raw.strip("[]").replace('"','').replace("'",'')
                 keys = [k.strip() for k in clean.split(',') if k.strip()]
         elif raw:
@@ -86,13 +89,12 @@ def _parse_gemini_keys():
         if k and k not in keys:
             keys.append(k)
 
-    # تنظيف نهائي: إزالة المفاتيح الفارغة أو القصيرة
     keys = [k.strip() for k in keys if k and len(k) > 20]
     return keys
 
 
 # ══════════════════════════════════════════════
-#  المفاتيح الفعلية
+#  المفاتيح الفعلية — تُقرأ فقط عند التشغيل
 # ══════════════════════════════════════════════
 GEMINI_API_KEYS    = _parse_gemini_keys()
 GEMINI_API_KEY     = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ""
