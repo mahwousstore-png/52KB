@@ -10,3 +10,10 @@ maxUploadSize = 200
 headless = true
 enableCORS = false
 enableXsrfProtection = false
+enableWebsocketCompression = false
+maxMessageSize = 200
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+serverAddress = "0.0.0.0"
