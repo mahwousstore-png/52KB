@@ -1,13 +1,13 @@
 """
-make_helper.py - أتمتة Make.com v20.0 (مُصلح)
+make_helper.py - أتمتة Make.com v21.0 (إصلاح product_id)
 ═══════════════════════════════════════════════════════
-الإصلاحات:
-  1. تحديث الأسعار: يرسل product_id + price بالتنسيق الذي يتوقعه
-     سيناريو "Integration Webhooks, Salla" (UpdateProduct)
-  2. إضافة منتجات جديدة: يرسل "data" (وليس "products") بحقول عربية
-     تطابق سيناريو "Mahwous - إضافة منتجات جديدة لسلة" (CreateProduct)
-  3. إرسال دفعات (batches) لتجنب timeout عند إرسال أكثر من 50 منتج
-  4. إعادة المحاولة (retry) مع تأخير تصاعدي
+الإصلاحات في v21:
+  1. إزالة شرط product_id الإجباري — التطبيق يعمل حتى بدون معرّف
+  2. إذا وُجد product_id → يُرسل مباشرة لتحديث المنتج في سلة
+  3. إذا لم يوجد product_id → يُرسل الاسم فقط ويُنبّه المستخدم
+  4. تحسين استخراج product_id من كل أسماء الأعمدة الممكنة في ملف سلة
+  5. إرسال دفعات (batches) لتجنب timeout
+  6. إعادة المحاولة (retry) مع تأخير تصاعدي
 ═══════════════════════════════════════════════════════
 """
 import requests, json, time, math
@@ -53,12 +53,10 @@ def _post_with_retry(url, payload, timeout=TIMEOUT):
                     "response_data": resp_data
                 }
             elif resp.status_code == 429:
-                # Rate limit — انتظر ثم أعد
                 last_error = f"Rate limit (429) — محاولة {attempt+1}/{MAX_RETRIES}"
                 time.sleep(RETRY_DELAY * (attempt + 1))
                 continue
             elif resp.status_code == 408:
-                # Timeout
                 last_error = f"Timeout (408) — محاولة {attempt+1}/{MAX_RETRIES}"
                 time.sleep(RETRY_DELAY)
                 continue
@@ -102,10 +100,10 @@ def _post_with_retry(url, payload, timeout=TIMEOUT):
 #
 #  Iterator: {{2.products}}
 #  Salla UpdateProduct:
-#    id    = {{4.product_id}}   ← معرّف المنتج في سلة (مطلوب!)
+#    id    = {{4.product_id}}   ← معرّف المنتج في سلة
 #    price = {{4.price}}        ← السعر الجديد
 #
-#  ⚠️ بدون product_id لن يعمل التحديث في سلة!
+#  ⚠️ v21: إذا لم يوجد product_id → يُرسل مع تنبيه (لا يمنع الإرسال)
 #  ─────────────────────────────────────
 
 def send_price_updates(products, webhook_url=None):
@@ -113,58 +111,61 @@ def send_price_updates(products, webhook_url=None):
     إرسال تحديثات الأسعار إلى Make.com → سلة.
 
     كل عنصر في products يجب أن يحتوي على:
-      - product_id  : معرّف المنتج في سلة (رقم أو نص)
+      - product_id  : معرّف المنتج في سلة (رقم أو نص) — مطلوب للتحديث
       - price       : السعر الجديد
-      - name        : اسم المنتج (اختياري — للتوثيق)
+      - name        : اسم المنتج (اختياري — للتوثيق والبحث)
       - sale_price  : سعر التخفيض (اختياري)
       - quantity    : الكمية (اختياري)
+    
+    v21: لا يمنع الإرسال إذا لم يوجد product_id — يُنبّه فقط
     """
     url = webhook_url or WEBHOOK_UPDATE_PRICES
     if not products:
         return {"success": False, "status_code": 0,
                 "message": "لا توجد منتجات للإرسال"}
 
-    # ─── التحقق من وجود product_id ───
-    missing_ids = [p for p in products if not p.get("product_id")]
-    if missing_ids:
-        names = [p.get("name", p.get("product_name", "؟")) for p in missing_ids[:5]]
-        return {
-            "success": False,
-            "status_code": 0,
-            "message": (
-                f"⚠️ {len(missing_ids)} منتج بدون product_id! "
-                f"سلة تحتاج معرّف المنتج لتحديث السعر.\n"
-                f"أمثلة: {', '.join(names)}\n"
-                f"💡 تأكد أن ملف منتجاتك يحتوي عمود معرّف المنتج (product_id أو id أو معرف)"
-            )
-        }
+    # ─── فصل المنتجات: مع معرّف / بدون معرّف ───
+    with_id = []
+    without_id = []
+    for p in products:
+        pid = _extract_product_id(p)
+        if pid:
+            p["_resolved_product_id"] = pid
+            with_id.append(p)
+        else:
+            without_id.append(p)
 
-    # ─── إرسال بدفعات ───
+    warnings = []
+    if without_id:
+        names = [p.get("name", p.get("المنتج", p.get("product_name", "؟")))
+                 for p in without_id[:5]]
+        warnings.append(
+            f"⚠️ {len(without_id)} منتج بدون معرّف سلة (product_id).\n"
+            f"أمثلة: {', '.join(names)}\n"
+            f"💡 هذه المنتجات ستُرسل بالاسم فقط — تأكد أن سيناريو Make.com يدعم البحث بالاسم."
+        )
+
+    # ─── إرسال المنتجات التي لها معرّف ───
+    all_products = with_id + without_id  # نرسل الكل — Make.com يتعامل مع الباقي
+    
     total_sent = 0
     total_failed = 0
     errors = []
 
-    batches = _split_batches(products, MAX_BATCH_SIZE)
+    batches = _split_batches(all_products, MAX_BATCH_SIZE)
     for batch_num, batch in enumerate(batches, 1):
-        # تنسيق يطابق Blueprint بالضبط
         payload = {
             "products": [
                 {
-                    "product_id": str(p["product_id"]),
-                    "name": str(p.get("name", p.get("product_name", ""))),
+                    "product_id": str(p.get("_resolved_product_id", "")),
+                    "name": str(p.get("name", p.get("المنتج", p.get("product_name", "")))),
                     "price": float(p.get("price", p.get("new_price", 0))),
-                    "sale_price": float(p.get("sale_price", 0)) if p.get("sale_price") else None,
-                    "quantity": int(p.get("quantity", 0)) if p.get("quantity") else None,
+                    **(_optional_field("sale_price", p.get("sale_price"))),
+                    **(_optional_field("quantity", p.get("quantity"))),
                 }
                 for p in batch
             ]
         }
-        # إزالة القيم None
-        for prod in payload["products"]:
-            payload["products"] = [
-                {k: v for k, v in prod.items() if v is not None}
-                for prod in payload["products"]
-            ]
 
         result = _post_with_retry(url, payload)
         if result["success"]:
@@ -173,33 +174,73 @@ def send_price_updates(products, webhook_url=None):
             total_failed += len(batch)
             errors.append(f"دفعة {batch_num}: {result['message']}")
 
-        # تأخير بين الدفعات
         if batch_num < len(batches):
             time.sleep(1)
 
     # ─── النتيجة ───
-    if total_failed == 0:
-        return {
-            "success": True,
-            "status_code": 200,
-            "message": f"✅ تم إرسال {total_sent} منتج لتحديث الأسعار بنجاح"
+    msg_parts = []
+    if total_sent > 0:
+        msg_parts.append(f"✅ تم إرسال {total_sent} منتج لتحديث الأسعار")
+        if len(with_id) > 0:
+            msg_parts.append(f"({len(with_id)} بمعرّف سلة)")
+        if len(without_id) > 0:
+            msg_parts.append(f"({len(without_id)} بالاسم فقط)")
+    if total_failed > 0:
+        msg_parts.append(f"❌ فشل {total_failed} منتج")
+        msg_parts.extend(errors[:3])
+    if warnings:
+        msg_parts.extend(warnings)
+
+    return {
+        "success": total_sent > 0,
+        "status_code": 200 if total_sent > 0 else 0,
+        "message": "\n".join(msg_parts),
+        "stats": {
+            "total": len(products),
+            "with_id": len(with_id),
+            "without_id": len(without_id),
+            "sent": total_sent,
+            "failed": total_failed,
         }
-    elif total_sent > 0:
-        return {
-            "success": True,
-            "status_code": 200,
-            "message": (
-                f"⚠️ تم إرسال {total_sent} منتج بنجاح، "
-                f"فشل {total_failed} منتج.\n" +
-                "\n".join(errors[:3])
-            )
-        }
-    else:
-        return {
-            "success": False,
-            "status_code": 0,
-            "message": f"❌ فشل إرسال جميع المنتجات ({total_failed}).\n" + "\n".join(errors[:3])
-        }
+    }
+
+
+def _extract_product_id(product_dict):
+    """
+    استخراج product_id من dict المنتج — يبحث في كل الأسماء الممكنة.
+    يرجع القيمة أو "" إذا لم يوجد.
+    """
+    # ترتيب الأولوية: الأكثر تحديداً أولاً
+    id_keys = [
+        # مفاتيح مباشرة
+        "product_id", "_resolved_product_id",
+        # أسماء سلة العربية
+        "معرف_المنتج", "معرف المنتج", "رقم المنتج", "رقم_المنتج",
+        "المعرف", "معرف",
+        # أسماء إنجليزية
+        "Product ID", "Product_ID", "ID", "id", "Id",
+        # SKU
+        "SKU", "sku", "Sku", "رمز المنتج", "رمز_المنتج", "رمز المنتج sku",
+        # أسماء أخرى
+        "الكود", "كود", "Code", "code",
+        "الرقم", "رقم",
+        "Barcode", "barcode", "الباركود",
+    ]
+    for key in id_keys:
+        val = product_dict.get(key, "")
+        if val and str(val) not in ("", "nan", "None", "0"):
+            return str(val).strip()
+    return ""
+
+
+def _optional_field(key, value):
+    """إرجاع dict بالحقل فقط إذا كانت القيمة موجودة وغير صفرية"""
+    if value is not None and value != 0 and value != "":
+        try:
+            return {key: float(value)}
+        except (ValueError, TypeError):
+            return {}
+    return {}
 
 
 # ══════════════════════════════════════════════════════
@@ -250,14 +291,12 @@ def send_new_products(products, webhook_url=None):
         return {"success": False, "status_code": 0,
                 "message": "لا توجد منتجات للإرسال"}
 
-    # ─── إرسال بدفعات ───
     total_sent = 0
     total_failed = 0
     errors = []
 
     batches = _split_batches(products, MAX_BATCH_SIZE)
     for batch_num, batch in enumerate(batches, 1):
-        # تنسيق يطابق Blueprint بالضبط — المفتاح "data" وليس "products"
         payload = {
             "data": [
                 _format_new_product(p)
@@ -275,7 +314,6 @@ def send_new_products(products, webhook_url=None):
         if batch_num < len(batches):
             time.sleep(1)
 
-    # ─── النتيجة ───
     if total_failed == 0:
         return {
             "success": True,
@@ -352,7 +390,6 @@ def send_missing_products(products, webhook_url=None):
     إرسال المنتجات المفقودة كمنتجات جديدة إلى سلة.
     يستخدم نفس سيناريو إضافة المنتجات الجديدة.
     """
-    # المنتجات المفقودة تُرسل بنفس تنسيق المنتجات الجديدة
     return send_new_products(products, webhook_url)
 
 
@@ -387,7 +424,6 @@ def test_webhook(webhook_type="update"):
     """اختبار اتصال Webhook"""
     url = WEBHOOK_UPDATE_PRICES if webhook_type == "update" else WEBHOOK_NEW_PRODUCTS
     try:
-        # إرسال بيانات اختبار بالتنسيق الصحيح
         if webhook_type == "update":
             payload = {
                 "products": [{
@@ -441,7 +477,7 @@ def export_to_make_format(df, section_type="update"):
     تحويل DataFrame إلى صيغة تطابق سيناريوهات Make.com بالضبط.
 
     section_type:
-      "update"  → تحديث أسعار (يحتاج product_id)
+      "update"  → تحديث أسعار (يستخدم product_id إن وُجد)
       "missing" → منتجات مفقودة (تُضاف كجديدة)
       "new"     → منتجات جديدة (price_lower)
     """
@@ -452,16 +488,9 @@ def export_to_make_format(df, section_type="update"):
 
         # ─── تحديث أسعار ───
         if section_type == "update":
-            # استخراج product_id من أي عمود ممكن
-            product_id = (
-                row.get("معرف_المنتج", "") or
-                row.get("معرف المنتج", "") or
-                row.get("product_id", "") or
-                row.get("id", "") or
-                row.get("معرف", "") or
-                row.get("ID", "") or
-                ""
-            )
+            # استخراج product_id من كل الأعمدة الممكنة
+            product_id = _extract_product_id_from_row(row)
+            
             our_price = float(row.get("السعر", 0) or 0)
             comp_price = float(row.get("سعر_المنافس", 0) or 0)
 
@@ -474,7 +503,7 @@ def export_to_make_format(df, section_type="update"):
                 "price": round(new_price, 2),
                 "sale_price": None,
                 "quantity": None,
-                # ─── حقول إضافية للتوثيق (لا يستخدمها Blueprint لكن مفيدة للسجل) ───
+                # حقول إضافية للتوثيق
                 "_old_price": our_price,
                 "_competitor_price": comp_price,
                 "_competitor_name": str(row.get("المنافس", "")).replace('.csv','').replace('.xlsx',''),
@@ -491,7 +520,6 @@ def export_to_make_format(df, section_type="update"):
             size_val = extract_size(pname)
             size_str = f"{int(size_val)}ml" if size_val else str(row.get("الحجم", ""))
 
-            # بناء وصف احترافي
             desc_parts = [f"عطر {brand}" if brand else "عطر"]
             if size_str:
                 desc_parts.append(size_str)
@@ -500,7 +528,6 @@ def export_to_make_format(df, section_type="update"):
                 desc_parts.append("تستر")
             description = " ".join(desc_parts)
 
-            # بناء SKU من اسم المنتج
             sku = _generate_sku(pname, brand)
 
             product = {
@@ -544,10 +571,42 @@ def export_to_make_format(df, section_type="update"):
     return products
 
 
+def _extract_product_id_from_row(row):
+    """
+    استخراج product_id من صف DataFrame — يبحث في كل أسماء الأعمدة الممكنة.
+    هذه الدالة تتعامل مع pandas Series (صف من DataFrame).
+    """
+    # ترتيب الأولوية: الأكثر تحديداً أولاً
+    id_columns = [
+        # أسماء النتائج من engine.py
+        "معرف_المنتج", "معرف المنتج",
+        # أسماء سلة الرسمية
+        "رقم المنتج", "رقم_المنتج",
+        "المعرف", "معرف",
+        # أسماء إنجليزية
+        "product_id", "Product ID", "Product_ID",
+        "ID", "id", "Id",
+        # SKU
+        "SKU", "sku", "Sku",
+        "رمز المنتج", "رمز_المنتج", "رمز المنتج sku",
+        # أسماء أخرى
+        "الكود", "كود", "Code", "code",
+        "الرقم", "رقم",
+        "Barcode", "barcode", "الباركود",
+    ]
+    for col in id_columns:
+        try:
+            val = row.get(col, "")
+            if val and str(val) not in ("", "nan", "None", "0", "0.0"):
+                return str(val).strip()
+        except:
+            continue
+    return ""
+
+
 def _generate_sku(product_name, brand=""):
     """توليد SKU بسيط من اسم المنتج"""
     import re, hashlib
-    # أخذ أول 3 حروف من الماركة + hash قصير
     brand_code = brand[:3].upper() if brand else "PRF"
     name_hash = hashlib.md5(product_name.encode('utf-8')).hexdigest()[:6].upper()
     return f"{brand_code}-{name_hash}"
@@ -557,5 +616,4 @@ def _estimate_weight(size_ml):
     """تقدير الوزن بالجرام من الحجم بالمل"""
     if not size_ml or size_ml <= 0:
         return 300  # وزن افتراضي
-    # تقريب: وزن العبوة + السائل
     return int(size_ml * 1.2 + 150)
