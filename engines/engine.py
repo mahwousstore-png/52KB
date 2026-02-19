@@ -961,6 +961,7 @@ def find_missing_products(our_df, comp_dfs):
             cp_gender = extract_gender(cp_raw)
 
             # ── تصفية المرشحين بالماركة أولاً (أسرع) ──
+            no_brand = not cp_brand  # ماركة غير معروفة → مطابقة غير موثوقة
             if cp_brand:
                 candidates = [x for x in our_items if x["brand"] == cp_brand]
                 cand_norms = [x["norm"] for x in candidates]
@@ -969,6 +970,10 @@ def find_missing_products(our_df, comp_dfs):
                 cand_norms = our_norms
 
             # ── بحث أفضل 3 مطابقات ──────────────────
+            # عند عدم وجود ماركة → cutoff أعلى لتجنب مطابقة كلمات عامة (عطر، مل، 100)
+            _cutoff = 75 if no_brand else 55
+            _req_score = 88 if no_brand else 70  # يجب أن يكون effective_score أعلى من هذا
+
             if not cand_norms:
                 # لا يوجد منتجات بهذه الماركة → مفقود مؤكد
                 found = False
@@ -976,7 +981,7 @@ def find_missing_products(our_df, comp_dfs):
                 matches = rf_process.extract(
                     cp_norm, cand_norms,
                     scorer=fuzz.token_sort_ratio,
-                    limit=3, score_cutoff=55
+                    limit=3, score_cutoff=_cutoff
                 )
                 found = False
                 for match_str, match_score, match_idx in matches:
@@ -1006,8 +1011,12 @@ def find_missing_products(our_df, comp_dfs):
                         if pline_score < 55:    penalty += 35
                         elif pline_score < 75:  penalty += 20
 
+                    # عقوبة إضافية: لا ماركة معروفة على الطرفين = غير موثوق
+                    if no_brand and not our_item["brand"]:
+                        penalty += 15
+
                     effective_score = match_score - penalty
-                    if effective_score >= 70:
+                    if effective_score >= _req_score:
                         found = True
                         break
 
