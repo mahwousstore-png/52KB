@@ -719,7 +719,10 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
     #   3. مطابقة جيدة (score 80-91) مع فرق سعر كبير → تصنيف بالسعر لكن بمراجعة
     #   4. مطابقة ضعيفة (score <80) → مراجعة
     #   5. بدون سعر → مراجعة
-    PRICE_DIFF_THRESHOLD = 10  # فرق السعر المقبول بالريال
+    # ═══ Threshold ذكي: 5% من سعر المنافس أو 10 ر.س حد أدنى ═══
+    # مثال: منتج 200ر.س → threshold=10ر.س | منتج 500ر.س → threshold=25ر.س
+    PRICE_DIFF_THRESHOLD = max(10.0, round(cp * 0.05, 2)) if cp > 0 else 10.0
+
     if override:
         dec = override
     elif our_price <= 0 or cp <= 0:
@@ -759,10 +762,12 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
               "gemini_no_match":"🤖❌"}.get(src, f"{score:.0f}%")
 
     ac = (all_cands or [best])[:5]
+    diff_pct_final = round((diff / cp) * 100, 1) if cp > 0 else 0
     return dict(المنتج=product, معرف_المنتج=our_id, السعر=our_price,
                 الماركة=brand, الحجم=sz_str, النوع=ptype, الجنس=gender,
                 منتج_المنافس=best["name"], معرف_المنافس=best.get("product_id",""),
-                سعر_المنافس=cp, الفرق=diff, نسبة_التطابق=score, ثقة_AI=ai_lbl,
+                سعر_المنافس=cp, الفرق=diff, نسبة_الفرق=diff_pct_final,
+                نسبة_التطابق=score, ثقة_AI=ai_lbl,
                 القرار=dec, الخطورة=risk, المنافس=best.get("competitor",""),
                 عدد_المنافسين=len({c.get("competitor","") for c in ac}),
                 جميع_المنافسين=ac, مصدر_المطابقة=src or "fuzzy",

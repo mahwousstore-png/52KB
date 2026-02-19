@@ -148,15 +148,22 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         st.info("لا توجد منتجات")
         return
 
-    # ── فلاتر ─────────────────────────────────
+    # ── بحث سريع (دائماً ظاهر) ────────────────
     opts = get_filter_options(df)
-    with st.expander("🔍 فلاتر متقدمة", expanded=False):
-        c1, c2, c3, c4 = st.columns(4)
-        search   = c1.text_input("🔎 بحث",    key=f"{prefix}_s")
-        brand_f  = c2.selectbox("🏷️ الماركة", opts["brands"],      key=f"{prefix}_b")
-        comp_f   = c3.selectbox("🏪 المنافس", opts["competitors"], key=f"{prefix}_c")
+    _sq1, _sq2, _sq3 = st.columns([3, 2, 1])
+    with _sq1:
+        search = st.text_input("🔎 بحث سريع في المنتجات...",
+                               key=f"{prefix}_s",
+                               placeholder="اكتب اسم منتج أو ماركة...")
+    with _sq2:
+        brand_f = st.selectbox("🏷️ الماركة", opts["brands"], key=f"{prefix}_b")
+    with _sq3:
+        comp_f = st.selectbox("🏪 المنافس", opts["competitors"], key=f"{prefix}_c")
+
+    # ── فلاتر متقدمة إضافية ───────────────────
+    with st.expander("⚙️ فلاتر متقدمة", expanded=False):
+        c4, c5, c6, c7 = st.columns(4)
         type_f   = c4.selectbox("🧴 النوع",   opts["types"],       key=f"{prefix}_t")
-        c5, c6, c7 = st.columns(3)
         match_min  = c5.slider("أقل تطابق%", 0, 100, 0, key=f"{prefix}_m")
         price_min  = c6.number_input("سعر من", 0.0, key=f"{prefix}_p1")
         price_max  = c7.number_input("سعر لـ", 0.0, key=f"{prefix}_p2")
@@ -666,6 +673,51 @@ elif page == "📂 رفع الملفات":
                             st.session_state.analysis_df = df_all
                             progress_bar.progress(1.0, "✅ اكتمل!")
                             st.balloons()
+                            # ── ملخص مالي ذكي ──────────────────────
+                            _r_fin = st.session_state.results
+                            _raise_df = _r_fin.get("price_raise", pd.DataFrame())
+                            _lower_df = _r_fin.get("price_lower", pd.DataFrame())
+                            _appr_df  = _r_fin.get("approved", pd.DataFrame())
+                            _rev_df   = _r_fin.get("review", pd.DataFrame())
+                            _miss_df  = _r_fin.get("missing", pd.DataFrame())
+                            _total = len(df_all)
+                            _loss_total = safe_float(_raise_df["الفرق"].sum()) if not _raise_df.empty and "الفرق" in _raise_df.columns else 0
+                            _gain_total = abs(safe_float(_lower_df["الفرق"].sum())) if not _lower_df.empty and "الفرق" in _lower_df.columns else 0
+                            _appr_pct = round(len(_appr_df) / max(_total, 1) * 100)
+                            st.markdown(f"""
+<div style="background:linear-gradient(135deg,#0a1628,#0e2040);border:1px solid #00C85344;
+            border-radius:12px;padding:16px;margin-top:12px">
+  <div style="font-weight:800;color:#00C853;font-size:1.1rem;margin-bottom:10px">
+    📊 ملخص مالي — نتائج التحليل
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center">
+    <div style="background:#FF174422;border:1px solid #FF174444;border-radius:8px;padding:10px">
+      <div style="color:#FF1744;font-size:1.5rem;font-weight:900">{len(_raise_df)}</div>
+      <div style="color:#aaa;font-size:.75rem">🔴 سعر أعلى</div>
+      <div style="color:#FF1744;font-size:.85rem;font-weight:700">تكلفة: {_loss_total:,.0f} ر.س</div>
+    </div>
+    <div style="background:#FFD60022;border:1px solid #FFD60044;border-radius:8px;padding:10px">
+      <div style="color:#FFD600;font-size:1.5rem;font-weight:900">{len(_lower_df)}</div>
+      <div style="color:#aaa;font-size:.75rem">🟢 سعر أقل</div>
+      <div style="color:#00C853;font-size:.85rem;font-weight:700">ربح محتمل: {_gain_total:,.0f} ر.س</div>
+    </div>
+    <div style="background:#00C85322;border:1px solid #00C85344;border-radius:8px;padding:10px">
+      <div style="color:#00C853;font-size:1.5rem;font-weight:900">{_appr_pct}%</div>
+      <div style="color:#aaa;font-size:.75rem">✅ أسعار تنافسية</div>
+      <div style="color:#00C853;font-size:.85rem;font-weight:700">{len(_appr_df)} منتج</div>
+    </div>
+    <div style="background:#ff980022;border:1px solid #ff980044;border-radius:8px;padding:10px">
+      <div style="color:#ff9800;font-size:1.5rem;font-weight:900">{len(_miss_df)}</div>
+      <div style="color:#aaa;font-size:.75rem">🔍 منتجات مفقودة</div>
+      <div style="color:#ff9800;font-size:.85rem;font-weight:700">فرص سوقية</div>
+    </div>
+  </div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid #ffffff11;
+              display:flex;justify-content:space-between;font-size:.8rem;color:#666">
+    <span>📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}</span>
+    <span>📦 إجمالي: {_total} منتج | 🔄 تحت المراجعة: {len(_rev_df)}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
                     else:
                         # ── مباشر ──
                         prog = st.progress(0, "جاري التحليل...")
@@ -696,6 +748,51 @@ elif page == "📂 رفع الملفات":
                                      len(df_all[df_all["نسبة_التطابق"]>0]), len(missing_df))
                         prog.progress(1.0, "✅ اكتمل!")
                         st.balloons()
+                        # ── ملخص مالي ذكي ──────────────────────
+                        _r_fin2 = st.session_state.results
+                        _raise2 = _r_fin2.get("price_raise", pd.DataFrame())
+                        _lower2 = _r_fin2.get("price_lower", pd.DataFrame())
+                        _appr2  = _r_fin2.get("approved", pd.DataFrame())
+                        _rev2   = _r_fin2.get("review", pd.DataFrame())
+                        _miss2  = _r_fin2.get("missing", pd.DataFrame())
+                        _total2 = len(df_all)
+                        _loss2 = safe_float(_raise2["الفرق"].sum()) if not _raise2.empty and "الفرق" in _raise2.columns else 0
+                        _gain2 = abs(safe_float(_lower2["الفرق"].sum())) if not _lower2.empty and "الفرق" in _lower2.columns else 0
+                        _appr_pct2 = round(len(_appr2) / max(_total2, 1) * 100)
+                        st.markdown(f"""
+<div style="background:linear-gradient(135deg,#0a1628,#0e2040);border:1px solid #00C85344;
+            border-radius:12px;padding:16px;margin-top:12px">
+  <div style="font-weight:800;color:#00C853;font-size:1.1rem;margin-bottom:10px">
+    📊 ملخص مالي — نتائج التحليل
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center">
+    <div style="background:#FF174422;border:1px solid #FF174444;border-radius:8px;padding:10px">
+      <div style="color:#FF1744;font-size:1.5rem;font-weight:900">{len(_raise2)}</div>
+      <div style="color:#aaa;font-size:.75rem">🔴 سعر أعلى</div>
+      <div style="color:#FF1744;font-size:.85rem;font-weight:700">تكلفة: {_loss2:,.0f} ر.س</div>
+    </div>
+    <div style="background:#FFD60022;border:1px solid #FFD60044;border-radius:8px;padding:10px">
+      <div style="color:#FFD600;font-size:1.5rem;font-weight:900">{len(_lower2)}</div>
+      <div style="color:#aaa;font-size:.75rem">🟢 سعر أقل</div>
+      <div style="color:#00C853;font-size:.85rem;font-weight:700">ربح محتمل: {_gain2:,.0f} ر.س</div>
+    </div>
+    <div style="background:#00C85322;border:1px solid #00C85344;border-radius:8px;padding:10px">
+      <div style="color:#00C853;font-size:1.5rem;font-weight:900">{_appr_pct2}%</div>
+      <div style="color:#aaa;font-size:.75rem">✅ أسعار تنافسية</div>
+      <div style="color:#00C853;font-size:.85rem;font-weight:700">{len(_appr2)} منتج</div>
+    </div>
+    <div style="background:#ff980022;border:1px solid #ff980044;border-radius:8px;padding:10px">
+      <div style="color:#ff9800;font-size:1.5rem;font-weight:900">{len(_miss2)}</div>
+      <div style="color:#aaa;font-size:.75rem">🔍 منتجات مفقودة</div>
+      <div style="color:#ff9800;font-size:.85rem;font-weight:700">فرص سوقية</div>
+    </div>
+  </div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid #ffffff11;
+              display:flex;justify-content:space-between;font-size:.8rem;color:#666">
+    <span>📅 {datetime.now().strftime('%Y-%m-%d %H:%M')}</span>
+    <span>📦 إجمالي: {_total2} منتج | 🔄 تحت المراجعة: {len(_rev2)}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
         else:
             st.warning("⚠️ ارفع ملف منتجاتنا وملف منافس واحد على الأقل")
 
