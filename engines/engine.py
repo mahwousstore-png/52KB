@@ -66,7 +66,7 @@ except:
         "كلوي","بالنسياغا","ميو ميو",
     ]
 WORD_REPLACEMENTS = {}
-MATCH_THRESHOLD = 85; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
+MATCH_THRESHOLD = 85; HIGH_CONFIDENCE = 95; REVIEW_THRESHOLD = 75
 PRICE_TOLERANCE = 5; TESTER_KEYWORDS = ["tester","تستر"]; SET_KEYWORDS = ["set","طقم","مجموعة"]
 GEMINI_API_KEYS = []
 
@@ -872,7 +872,7 @@ def find_missing_products(our_df, comp_dfs):
             cp = str(row.get(ccol, "")).strip()
             if not cp or is_sample(cp): continue
             cn = normalize(cp)
-            if not cn or cn in seen: continue
+            if not cn: continue
             
             c_brand = extract_brand(cp)
             c_pline = extract_product_line(cp, c_brand)
@@ -913,7 +913,7 @@ def find_missing_products(our_df, comp_dfs):
                         final_score = match_score - penalty
                         
                         # إذا بقي السكور أعلى من 68 بعد العقوبات، إذن المنتج موجود لدينا فعلاً
-                        if final_score >= 68:
+                        if final_score >= 85:
                             is_missing = False
                             break  # توقف عن البحث، المنتج ليس مفقوداً
                             
