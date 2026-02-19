@@ -65,11 +65,10 @@ except:
         "جيمي تشو","لاليك","بوليس","فيكتور رولف",
         "كلوي","بالنسياغا","ميو ميو",
     ]
-    WORD_REPLACEMENTS = {}
+WORD_REPLACEMENTS = {}
 MATCH_THRESHOLD = 85; HIGH_CONFIDENCE = 92; REVIEW_THRESHOLD = 75
 PRICE_TOLERANCE = 5; TESTER_KEYWORDS = ["tester","تستر"]; SET_KEYWORDS = ["set","طقم","مجموعة"]
-    GEMINI_API_KEYS = []
-
+GEMINI_API_KEYS = []
 # ─── مرادفات ذكية للعطور ────────────────────
 _SYN = {
     "eau de parfum":"edp","او دو بارفان":"edp","أو دو بارفان":"edp",
