@@ -204,7 +204,13 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
     with ac4:
         if st.button("📤 إرسال كل لـ Make", key=f"{prefix}_make_all"):
             products = export_to_make_format(filtered, section_type)
-            res = send_price_updates(products) if section_type == "update" else send_new_products(products)
+            # إصلاح: اختيار الدالة الصحيحة حسب نوع القسم
+            if section_type == "update":
+                res = send_price_updates(products)
+            elif section_type in ("missing", "new"):
+                res = send_new_products(products)
+            else:
+                res = send_price_updates(products)
             st.success(res["message"]) if res["success"] else st.error(res["message"])
     with ac5:
         # جمع القرارات المعلقة وإرسالها
@@ -509,10 +515,14 @@ if page == "📊 لوحة التحكم":
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         with cc2:
             if st.button("📤 إرسال كل شيء لـ Make"):
+                # إصلاح: إرسال تحديثات الأسعار (سعر أعلى وأقل)
                 for key in ["price_raise","price_lower"]:
                     if key in r and not r[key].empty:
                         send_price_updates(export_to_make_format(r[key], "update"))
-                st.success("✅ تم!")
+                # إرسال المنتجات المفقودة كمنتجات جديدة
+                if "missing" in r and not r["missing"].empty:
+                    send_new_products(export_to_make_format(r["missing"], "missing"))
+                st.success("✅ تم إرسال جميع البيانات لـ Make!")
     else:
         # استئناف آخر job؟
         last = get_last_job()
@@ -1253,12 +1263,15 @@ elif page == "⚡ أتمتة Make":
         if st.session_state.results:
             wh = st.selectbox("نوع الإرسال", ["تحديث أسعار","منتجات جديدة","مفقودة"])
             key_map = {"تحديث أسعار":"price_raise","منتجات جديدة":"price_lower","مفقودة":"missing"}
+            # إصلاح: ربط نوع الإرسال بـ section_type الصحيح لـ export_to_make_format
+            section_type_map = {"price_raise":"update","price_lower":"new","missing":"missing"}
             sec_key = key_map[wh]
             df_s = st.session_state.results.get(sec_key, pd.DataFrame())
             if not df_s.empty:
                 st.info(f"سيتم إرسال {len(df_s)} منتج")
                 if st.button("📤 إرسال الآن"):
-                    products = export_to_make_format(df_s, sec_key)
+                    sec_type = section_type_map[sec_key]
+                    products = export_to_make_format(df_s, sec_type)
                     func = {"تحديث أسعار": send_price_updates,
                             "منتجات جديدة": send_new_products,
                             "مفقودة": send_missing_products}
