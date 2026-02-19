@@ -745,13 +745,23 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
     results = []
     our_col       = _fcol(our_df, ["المنتج","اسم المنتج","Product","Name","name"])
     our_price_col = _fcol(our_df, ["السعر","سعر","Price","price","PRICE"])
-    our_id_col    = _fcol(our_df, ["ID","id","معرف","رقم المنتج","SKU","sku","الكود"])
+    our_id_col    = _fcol(our_df, [
+        "رقم المنتج","معرف المنتج","المعرف","معرف","رقم_المنتج","معرف_المنتج",
+        "product_id","Product ID","Product_ID","ID","id","Id",
+        "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
+        "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
+    ])
 
     # ── بناء الفهارس المسبقة ──
     indices = {}
     for cname, cdf in comp_dfs.items():
         ccol = _fcol(cdf, ["المنتج","اسم المنتج","Product","Name","name"])
-        icol = _fcol(cdf, ["ID","id","معرف","رقم المنتج","SKU","sku","الكود","code"])
+        icol = _fcol(cdf, [
+            "رقم المنتج","معرف المنتج","المعرف","معرف","رقم_المنتج","معرف_المنتج",
+            "product_id","Product ID","Product_ID","ID","id","Id",
+            "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
+            "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
+        ])
         indices[cname] = CompIndex(cdf, ccol, icol, cname)
 
     total   = len(our_df)
@@ -838,7 +848,12 @@ def find_missing_products(our_df, comp_dfs):
     missing, seen = [], set()
     for cname, cdf in comp_dfs.items():
         ccol = _fcol(cdf, ["المنتج","اسم المنتج","Product","Name","name"])
-        icol = _fcol(cdf, ["ID","id","معرف","رقم المنتج","SKU","sku","الكود","code"])
+        icol = _fcol(cdf, [
+            "رقم المنتج","معرف المنتج","المعرف","معرف","رقم_المنتج","معرف_المنتج",
+            "product_id","Product ID","Product_ID","ID","id","Id",
+            "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
+            "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
+        ])
         for _, row in cdf.iterrows():
             cp = str(row.get(ccol,"")).strip()
             if not cp or is_sample(cp): continue
