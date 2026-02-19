@@ -90,20 +90,24 @@ def init_db():
 
 # ─── أحداث ────────────────────────────────
 def log_event(page, event_type, details="", product_name="", action=""):
+    conn = None
     try:
         conn = get_db()
         conn.execute(
             "INSERT INTO events (timestamp,page,event_type,details,product_name,action_taken) VALUES (?,?,?,?,?,?)",
             (_ts(), page, event_type, details, product_name, action)
         )
-        conn.commit(); conn.close()
-    except (sqlite3.Error, Exception) as e:
+        conn.commit()
+    except (sqlite3.Error, Exception):
         pass  # Silently log failures to prevent blocking UI
+    finally:
+        if conn: conn.close()
 
 
 # ─── قرارات ────────────────────────────────
 def log_decision(product_name, old_status, new_status, reason="",
                  our_price=0, comp_price=0, diff=0, competitor=""):
+    conn = None
     try:
         conn = get_db()
         conn.execute(
@@ -114,12 +118,15 @@ def log_decision(product_name, old_status, new_status, reason="",
             (_ts(), product_name, our_price, comp_price, diff,
              competitor, old_status, new_status, reason)
         )
-        conn.commit(); conn.close()
-    except (sqlite3.Error, Exception) as e:
+        conn.commit()
+    except (sqlite3.Error, Exception):
         pass  # Silently log failures to prevent blocking UI
+    finally:
+        if conn: conn.close()
 
 
 def get_decisions(product_name=None, status=None, limit=100):
+    conn = None
     try:
         conn = get_db()
         if product_name:
@@ -136,10 +143,11 @@ def get_decisions(product_name=None, status=None, limit=100):
             rows = conn.execute(
                 "SELECT * FROM decisions ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except (sqlite3.Error, Exception):
         return []
+    finally:
+        if conn: conn.close()
 
 
 # ─── تاريخ الأسعار (الميزة الذكية) ──────────
@@ -205,6 +213,7 @@ def upsert_price_history(product_name, competitor, price,
 
 
 def get_price_history(product_name, competitor="", limit=30):
+    conn = None
     try:
         conn = get_db()
         if competitor:
@@ -220,14 +229,16 @@ def get_price_history(product_name, competitor="", limit=30):
                    ORDER BY date DESC LIMIT ?""",
                 (product_name, limit)
             ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except (sqlite3.Error, Exception):
         return []
+    finally:
+        if conn: conn.close()
 
 
 def get_price_changes(days=7):
     """منتجات تغير سعرها خلال X يوم"""
+    conn = None
     try:
         conn = get_db()
         rows = conn.execute(
@@ -246,10 +257,11 @@ def get_price_changes(days=7):
                LIMIT 100""",
             (f"-{days} days",)
         ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except (sqlite3.Error, Exception):
         return []
+    finally:
+        if conn: conn.close()
 
 
 # ─── المعالجة الخلفية ──────────────────────
@@ -276,12 +288,12 @@ def save_job_progress(job_id, total, processed, results, status="running",
 
 
 def get_job_progress(job_id):
+    conn = None
     try:
         conn = get_db()
         row = conn.execute(
             "SELECT * FROM job_progress WHERE job_id=?", (job_id,)
         ).fetchone()
-        conn.close()
         if row:
             d = dict(row)
             try:
@@ -291,16 +303,18 @@ def get_job_progress(job_id):
             return d
     except (sqlite3.Error, Exception):
         pass
+    finally:
+        if conn: conn.close()
     return None
 
 
 def get_last_job():
+    conn = None
     try:
         conn = get_db()
         row = conn.execute(
             "SELECT * FROM job_progress ORDER BY id DESC LIMIT 1"
         ).fetchone()
-        conn.close()
         if row:
             d = dict(row)
             try:
@@ -310,11 +324,14 @@ def get_last_job():
             return d
     except (sqlite3.Error, Exception):
         pass
+    finally:
+        if conn: conn.close()
     return None
 
 
 # ─── سجل التحليلات ─────────────────────────
 def log_analysis(our_file, comp_file, total, matched, missing, summary=""):
+    conn = None
     try:
         conn = get_db()
         conn.execute(
@@ -323,24 +340,29 @@ def log_analysis(our_file, comp_file, total, matched, missing, summary=""):
                VALUES (?,?,?,?,?,?,?)""",
             (_ts(), our_file, comp_file, total, matched, missing, summary)
         )
-        conn.commit(); conn.close()
+        conn.commit()
     except (sqlite3.Error, Exception):
         pass
+    finally:
+        if conn: conn.close()
 
 
 def get_analysis_history(limit=20):
+    conn = None
     try:
         conn = get_db()
         rows = conn.execute(
             "SELECT * FROM analysis_history ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except (sqlite3.Error, Exception):
         return []
+    finally:
+        if conn: conn.close()
 
 
 def get_events(page=None, limit=50):
+    conn = None
     try:
         conn = get_db()
         if page:
@@ -352,10 +374,11 @@ def get_events(page=None, limit=50):
             rows = conn.execute(
                 "SELECT * FROM events ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
-        conn.close()
         return [dict(r) for r in rows]
     except (sqlite3.Error, Exception):
         return []
+    finally:
+        if conn: conn.close()
 
 
 init_db()

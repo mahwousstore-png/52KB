@@ -266,7 +266,7 @@ def fetch_fragrantica_info(product_name):
             data = json.loads(clean[s:e])
             # تأكد image_url صالح
             img = data.get("image_url", "")
-            if not img or not img.startswith("http"):
+            if not img or not isinstance(img, str) or not img.startswith("http"):
                 data["image_url"] = ""
             return {"success": True, **data}
     except (json.JSONDecodeError, KeyError, Exception):

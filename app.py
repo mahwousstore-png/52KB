@@ -1371,15 +1371,15 @@ elif page == "🤖 الذكاء الصناعي":
             _full = f"سياق البيانات: {_ctx_str}\n\n{_msg_to_send}"
             with st.spinner("🤖 Gemini يفكر..."):
                 _res = gemini_chat(_full, st.session_state.chat_history)
-            if _res["success"]:
+            if _res and _res.get("success"):
                 st.session_state.chat_history.append({
-                    "user": _msg_to_send, "ai": _res["response"],
+                    "user": _msg_to_send, "ai": _res.get("response", ""),
                     "source": _res.get("source","Gemini"),
                     "ts": datetime.now().strftime("%H:%M")
                 })
                 st.rerun()
             else:
-                st.error(_res["response"])
+                st.error(_res.get("response", "فشل الاتصال بـ Gemini") if _res else "فشل الاتصال بـ Gemini")
 
         _dc1, _dc2 = st.columns([4,1])
         with _dc2:

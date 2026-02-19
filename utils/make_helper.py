@@ -451,6 +451,8 @@ def send_single_product(product, action="update"):
 def test_webhook(webhook_type="update"):
     """اختبار اتصال Webhook"""
     url = WEBHOOK_UPDATE_PRICES if webhook_type == "update" else WEBHOOK_NEW_PRODUCTS
+    if not url or not url.startswith("http"):
+        return {"success": False, "url": url or "", "message": "❌ رابط Webhook غير مضبوط في الإعدادات"}
     try:
         if webhook_type == "update":
             payload = {
