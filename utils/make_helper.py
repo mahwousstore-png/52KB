@@ -221,6 +221,7 @@ def _extract_product_id(product_dict):
         "المعرف", "معرف",
         # أسماء إنجليزية
         "Product ID", "Product_ID", "ID", "id", "Id",
+        "NO", "No", "no", "NUMBER", "number", "Num", "num",
         # SKU
         "SKU", "sku", "Sku", "رمز المنتج", "رمز_المنتج", "رمز المنتج sku",
         # أسماء أخرى
