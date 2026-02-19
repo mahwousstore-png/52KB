@@ -620,6 +620,7 @@ def _extract_product_id_from_row(row):
         # أسماء إنجليزية
         "product_id", "Product ID", "Product_ID",
         "ID", "id", "Id",
+        "NO", "No", "no", "NUMBER", "number", "Num", "num",
         # SKU
         "SKU", "sku", "Sku",
         "رمز المنتج", "رمز_المنتج", "رمز المنتج sku",

@@ -811,6 +811,7 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
         icol = _fcol(cdf, [
             "رقم المنتج","معرف المنتج","المعرف","معرف","رقم_المنتج","معرف_المنتج",
             "product_id","Product ID","Product_ID","ID","id","Id",
+            "NO","No","no","NUMBER","number","Num","num",
             "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
             "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
         ])
@@ -940,6 +941,7 @@ def find_missing_products(our_df, comp_dfs):
         icol = _fcol(cdf, [
             "رقم المنتج","معرف المنتج","المعرف","معرف","رقم_المنتج","معرف_المنتج",
             "product_id","Product ID","Product_ID","ID","id","Id",
+            "NO","No","no","NUMBER","number","Num","num",
             "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
             "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
         ])
