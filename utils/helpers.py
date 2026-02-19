@@ -23,7 +23,7 @@ def format_price(price, currency="ر.س") -> str:
     """تنسيق عرض السعر"""
     try:
         return f"{float(price):,.0f} {currency}"
-    except:
+    except (ValueError, TypeError):
         return f"0 {currency}"
 
 
@@ -34,7 +34,7 @@ def format_diff(diff) -> str:
         d = float(diff)
         sign = "+" if d > 0 else ""
         return f"{sign}{d:,.0f} ر.س"
-    except:
+    except (ValueError, TypeError):
         return "0 ر.س"
 
 
@@ -196,7 +196,7 @@ def parse_pasted_text(text: str):
             try:
                 df = pd.DataFrame(rows[1:], columns=rows[0])
                 return df, f"✅ تم تحليل {len(df)} صف"
-            except:
+            except (ValueError, KeyError, Exception):
                 pass
 
     # محاولة 2: TSV (tabs)
@@ -204,14 +204,14 @@ def parse_pasted_text(text: str):
         try:
             df = pd.read_csv(io.StringIO(text), sep='\t')
             return df, f"✅ تم تحليل {len(df)} صف (TSV)"
-        except:
+        except (pd.errors.ParserError, Exception):
             pass
 
     # محاولة 3: CSV
     try:
         df = pd.read_csv(io.StringIO(text))
         return df, f"✅ تم تحليل {len(df)} صف (CSV)"
-    except:
+    except (pd.errors.ParserError, Exception):
         pass
 
     # محاولة 4: كل سطر منتج

@@ -63,7 +63,7 @@ for k, v in _defaults.items():
 # ── دوال مساعدة ───────────────────────────
 def db_log(page, action, details=""):
     try: log_event(page, action, details)
-    except: pass
+    except (Exception,): pass
 
 def ts_badge(ts_str=""):
     """شارة تاريخ مصغرة جميلة"""
@@ -511,7 +511,7 @@ with st.sidebar:
                 try:
                     v = st.secrets[key_name]
                     st.success(f"✅ وجدت {key_name} = {str(v)[:20]}...")
-                except:
+                except (KeyError, Exception):
                     st.warning(f"❌ {key_name} غير موجود")
 
     # حالة المعالجة
@@ -1412,7 +1412,7 @@ elif page == "🤖 الذكاء الصناعي":
                         _csv_p = _df_p.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                         st.download_button("📄 تحميل CSV", data=_csv_p,
                             file_name="pasted.csv", mime="text/csv", key="paste_dl")
-                    except:
+                    except (pd.errors.ParserError, Exception):
                         st.warning("تعذر التحويل لجدول — جرب تنسيق CSV أو TSV")
 
     # ═══ TAB 3: تحقق منتج ══════════════════════

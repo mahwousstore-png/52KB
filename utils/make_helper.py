@@ -634,7 +634,7 @@ def _extract_product_id_from_row(row):
             val = row.get(col, "")
             if val and str(val) not in ("", "nan", "None", "0", "0.0"):
                 return str(val).strip()
-        except:
+        except (ValueError, AttributeError):
             continue
     return ""
 

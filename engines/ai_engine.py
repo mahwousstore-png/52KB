@@ -90,7 +90,8 @@ def _call_gemini(prompt, system="", grounding=False, stream=False):
                     return "".join(p.get("text","") for p in parts)
             elif r.status_code == 429:
                 time.sleep(1); continue
-        except: continue
+        except (requests.RequestException, json.JSONDecodeError, KeyError):
+            continue
     return None
 
 def _call_openrouter(prompt, system=""):
@@ -105,7 +106,8 @@ def _call_openrouter(prompt, system=""):
         }, headers={"Authorization":f"Bearer {OPENROUTER_API_KEY}"}, timeout=35)
         if r.status_code == 200:
             return r.json()["choices"][0]["message"]["content"]
-    except: pass
+    except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError):
+        pass
     return None
 
 def _call_cohere(prompt, system=""):
@@ -117,7 +119,8 @@ def _call_cohere(prompt, system=""):
         }, headers={"Authorization":f"Bearer {COHERE_API_KEY}"}, timeout=35)
         if r.status_code == 200:
             return r.json().get("generations",[{}])[0].get("text","")
-    except: pass
+    except (requests.RequestException, json.JSONDecodeError, IndexError):
+        pass
     return None
 
 def call_ai(prompt, page="general"):
@@ -161,7 +164,8 @@ def gemini_chat(message, history=None, system_extra=""):
                     return {"success":True,"response":text,"source":"Gemini Flash"}
             elif r.status_code == 429:
                 time.sleep(1); continue
-        except: continue
+        except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError):
+            continue
 
     r = _call_openrouter(message, sys)
     if r: return {"success":True,"response":r,"source":"OpenRouter"}
@@ -181,7 +185,7 @@ def verify_match(p1, p2, pr1=0, pr2=0):
         s=clean.find('{'); e=clean.rfind('}')+1
         data = json.loads(clean[s:e])
         return {"success":True, **data}
-    except:
+    except (json.JSONDecodeError, ValueError):
         return {"success":True,"match":"true" in txt.lower(),"confidence":70,"reason":txt[:200]}
 
 # ══ بحث أسعار السوق — أرخص 5 منافسين ══════
@@ -225,7 +229,7 @@ def search_market_price(product_name, our_price=0):
                 key=lambda x: x.get("price", 9999)
             )[:5]
             return {"success": True, **data}
-    except:
+    except (json.JSONDecodeError, KeyError, Exception):
         pass
     return {"success": True, "market_price": our_price,
             "competitors": [], "recommendation": txt[:300]}
@@ -265,7 +269,7 @@ def fetch_fragrantica_info(product_name):
             if not img or not img.startswith("http"):
                 data["image_url"] = ""
             return {"success": True, **data}
-    except:
+    except (json.JSONDecodeError, KeyError, Exception):
         pass
     return {"success": False, "image_url": "", "description_ar": txt[:200] if txt else ""}
 
@@ -358,7 +362,8 @@ def search_mahwous(product_name):
         s=clean.find('{'); e=clean.rfind('}')+1
         if s>=0 and e>s:
             return {"success":True, **json.loads(clean[s:e])}
-    except: pass
+    except (json.JSONDecodeError, ValueError):
+        pass
     return {"success":True,"likely_available":False,"confidence":50,"reason":txt[:150]}
 
 # ══ تحقق مكرر ═══════════════════════════════

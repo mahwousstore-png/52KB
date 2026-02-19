@@ -22,7 +22,7 @@ try:
     from config import (REJECT_KEYWORDS, KNOWN_BRANDS, WORD_REPLACEMENTS,
                         MATCH_THRESHOLD, HIGH_CONFIDENCE, REVIEW_THRESHOLD,
                         PRICE_TOLERANCE, TESTER_KEYWORDS, SET_KEYWORDS, GEMINI_API_KEYS)
-except:
+except (ImportError, AttributeError):
     REJECT_KEYWORDS = ["sample","عينة","عينه","decant","تقسيم","split","miniature"]
     KNOWN_BRANDS = [
         "Dior","Chanel","Gucci","Tom Ford","Versace","Armani","YSL","Prada","Burberry",
@@ -150,14 +150,16 @@ def _init_db():
         cn = sqlite3.connect(_DB, check_same_thread=False)
         cn.execute("CREATE TABLE IF NOT EXISTS cache(h TEXT PRIMARY KEY, v TEXT, ts TEXT)")
         cn.commit(); cn.close()
-    except: pass
+    except (sqlite3.Error, Exception):
+        pass
 
 def _cget(k):
     try:
         cn = sqlite3.connect(_DB, check_same_thread=False)
         r = cn.execute("SELECT v FROM cache WHERE h=?", (k,)).fetchone()
         cn.close(); return json.loads(r[0]) if r else None
-    except: return None
+    except (sqlite3.Error, json.JSONDecodeError, Exception):
+        return None
 
 def _cset(k, v):
     try:
@@ -165,7 +167,8 @@ def _cset(k, v):
         cn.execute("INSERT OR REPLACE INTO cache VALUES(?,?,?)",
                    (k, json.dumps(v, ensure_ascii=False), datetime.now().isoformat()))
         cn.commit(); cn.close()
-    except: pass
+    except (sqlite3.Error, Exception):
+        pass
 
 _init_db()
 
@@ -179,9 +182,10 @@ def read_file(f):
                 try:
                     f.seek(0)
                     df = pd.read_csv(f, encoding=enc, on_bad_lines='skip')
-                    if len(df) > 0 and not df.columns[0].startswith('\ufeff'): 
+                    if len(df) > 0 and not df.columns[0].startswith('\ufeff'):
                         break
-                except: continue
+                except (pd.errors.ParserError, UnicodeDecodeError, Exception):
+                    continue
             if df is None:
                 return None, "فشل قراءة الملف بجميع الترميزات"
         elif name.endswith(('.xlsx','.xls')):
@@ -219,7 +223,7 @@ def _smart_rename_columns(df):
                 try:
                     float(str(v).replace(',', ''))
                     numeric_count += 1
-                except:
+                except (ValueError, TypeError):
                     pass
             if numeric_count >= len(sample) * 0.7:
                 new_cols[col] = 'السعر'
@@ -406,14 +410,15 @@ def _price(row):
     for c in ["السعر","Price","price","سعر","PRICE"]:
         if c in row.index:
             try: return float(str(row[c]).replace(",",""))
-            except: pass
+            except (ValueError, TypeError):
+                pass
     # احتياطي: ابحث عن أي عمود رقمي يشبه السعر
     for c in row.index:
         try:
             v = float(str(row[c]).replace(",",""))
             if 1 <= v <= 99999:  # نطاق سعر معقول
                 return v
-        except:
+        except (ValueError, TypeError):
             pass
     return 0.0
 
@@ -680,7 +685,7 @@ def _ai_batch(batch):
                         for j,it in enumerate(batch):
                             n = raw[j] if j<len(raw) else 0
                             try: n=int(n)
-                            except: n=0
+                            except (ValueError, TypeError): n=0
                             if 1<=n<=len(it["candidates"]): out.append(n-1)
                             elif n==0: out.append(-1)
                             else: out.append(-1)  # أي قيمة غير صالحة → لا مطابقة
@@ -688,7 +693,8 @@ def _ai_batch(batch):
                         return out
                 elif r.status_code==429:
                     time.sleep(2**attempt)
-            except: continue
+            except (requests.RequestException, json.JSONDecodeError, Exception):
+                continue
         time.sleep(1)
     # v21.1: إذا فشل AI → الكل "مراجعة" بدلاً من اختيار المرشح الأول تلقائياً
     return [-1]*len(batch)
@@ -855,7 +861,7 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
         our_price = 0.0
         if our_price_col:
             try: our_price = float(str(row[our_price_col]).replace(",",""))
-            except: pass
+            except (ValueError, TypeError): pass
 
         our_id  = _pid(row, our_id_col)
         brand   = extract_brand(product)
