@@ -530,7 +530,7 @@ if page == "📊 لوحة التحكم":
             "product_name": "المنتج", "competitor": "المنافس",
             "old_price": "السعر السابق", "new_price": "السعر الجديد",
             "price_diff": "التغيير", "new_date": "التاريخ"
-        }), use_container_width=True, height=200)
+        }).head(200), use_container_width=True, height=200)
         st.markdown("---")
 
     if st.session_state.results:
@@ -1178,7 +1178,7 @@ elif page == "🤖 الذكاء الصناعي":
                     try:
                         import io as _io
                         _df_p = pd.read_csv(_io.StringIO(_paste), sep=None, engine='python')
-                        st.dataframe(_df_p, use_container_width=True)
+                        st.dataframe(_df_p.head(200), use_container_width=True)
                         _csv_p = _df_p.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                         st.download_button("📄 تحميل CSV", data=_csv_p,
                             file_name="pasted.csv", mime="text/csv", key="paste_dl")
@@ -1384,7 +1384,7 @@ elif page == "⚡ أتمتة Make":
                  "وقت القرار": v.get("ts",""), "المنافس": v.get("competitor","")}
                 for k, v in pending.items()
             ])
-            st.dataframe(df_p, use_container_width=True)
+            st.dataframe(df_p.head(200), use_container_width=True)
 
             c1, c2 = st.columns(2)
             with c1:
@@ -1440,7 +1440,7 @@ elif page == "⚙️ الإعدادات":
                 "timestamp":"التاريخ","product_name":"المنتج",
                 "old_status":"من","new_status":"إلى",
                 "reason":"السبب","competitor":"المنافس"
-            }), use_container_width=True)
+            }).head(200), use_container_width=True)
         else:
             st.info("لا توجد قرارات مسجلة")
 
@@ -1463,7 +1463,7 @@ elif page == "📜 السجل":
                 "timestamp":"التاريخ","our_file":"ملف منتجاتنا",
                 "comp_file":"ملف المنافس","total_products":"الإجمالي",
                 "matched":"متطابق","missing":"مفقود"
-            }), use_container_width=True)
+            }).head(200), use_container_width=True)
         else:
             st.info("لا يوجد تاريخ")
 
@@ -1476,7 +1476,7 @@ elif page == "📜 السجل":
                 "product_name":"المنتج","competitor":"المنافس",
                 "old_price":"السعر السابق","new_price":"السعر الجديد",
                 "price_diff":"التغيير","new_date":"تاريخ التغيير"
-            }), use_container_width=True)
+            }).head(200), use_container_width=True)
         else:
             st.info(f"لا توجد تغييرات في آخر {days} يوم")
 
@@ -1487,6 +1487,6 @@ elif page == "📜 السجل":
             st.dataframe(df_e[["timestamp","page","event_type","details"]].rename(columns={
                 "timestamp":"التاريخ","page":"الصفحة",
                 "event_type":"الحدث","details":"التفاصيل"
-            }), use_container_width=True)
+            }).head(200), use_container_width=True)
         else:
             st.info("لا توجد أحداث")
