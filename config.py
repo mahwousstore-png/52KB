@@ -2,8 +2,8 @@
 config.py - الإعدادات المركزية v19.0
 المفاتيح محمية عبر Streamlit Secrets
 """
-import streamlit as st
 import json as _json
+import os as _os
 
 # ===== معلومات التطبيق =====
 APP_TITLE   = "نظام التسعير الذكي - مهووس"
@@ -19,28 +19,23 @@ GEMINI_MODEL = "gemini-2.0-flash"
 def _s(key, default=""):
     """
     يقرأ Secret بـ 3 طرق:
-    1. st.secrets[key]         الطريقة المباشرة
-    2. st.secrets.get(key)     الطريقة الاحتياطية
-    3. os.environ              للتطوير المحلي
+    1. st.secrets[key]         الطريقة المباشرة (Streamlit Cloud)
+    2. os.environ              Railway Environment Variables
+    3. default                 القيمة الافتراضية
     """
-    import os
-    # 1. st.secrets dict-style
+    # 1. Railway / os.environ أولاً (يعمل في البناء والتشغيل)
+    v = _os.environ.get(key, "")
+    if v:
+        return v
+    # 2. st.secrets (Streamlit Cloud فقط - يُستدعى عند التشغيل)
     try:
+        import streamlit as st
         v = st.secrets[key]
         if v is not None:
             return str(v) if not isinstance(v, (list, dict)) else v
     except Exception:
         pass
-    # 2. st.secrets.get
-    try:
-        v = st.secrets.get(key)
-        if v is not None:
-            return str(v) if not isinstance(v, (list, dict)) else v
-    except Exception:
-        pass
-    # 3. Environment variable
-    v = os.environ.get(key, "")
-    return v if v else default
+    return default
 
 
 def _parse_gemini_keys():
@@ -123,8 +118,8 @@ COLORS = {
 # ══════════════════════════════════════════════
 #  إعدادات المطابقة
 # ══════════════════════════════════════════════
-MATCH_THRESHOLD    = 68
-HIGH_CONFIDENCE    = 92
+MATCH_THRESHOLD    = 85
+HIGH_CONFIDENCE    = 95
 REVIEW_THRESHOLD   = 75
 PRICE_TOLERANCE    = 5
 MIN_MATCH_SCORE    = MATCH_THRESHOLD
