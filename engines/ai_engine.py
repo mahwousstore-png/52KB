@@ -285,7 +285,14 @@ def bulk_verify(items, section="general"):
         f"فرق: {it.get('our_price',0)-it.get('comp_price',0):+.0f}"
         for i,it in enumerate(items)
     )
-    prompt = f"حلّل هذه المنتجات وأعطِ توصية لكل منها:\n{lines}"
+    _section_instructions = {
+        "price_raise": "سعرنا أعلى. لكل منتج: 1.هل المطابقة صحيحة؟ 2.هل نخفض السعر؟ 3.السعر المقترح. رتّبهم من الأعلى فرقاً للأقل.",
+        "price_lower": "سعرنا أقل = ربح ضائع. لكل منتج: 1.هل يمكن رفع السعر؟ 2.السعر الأمثل (أقل من المنافس بـ5-15). 3.الربح المتوقع.",
+        "review": "هذه مطابقات غير مؤكدة. لكل منتج: هل هما نفس العطر فعلاً؟ ✅ نعم / ❌ لا / ⚠️ غير متأكد. اشرح السبب.",
+        "approved": "هذه منتجات موافق عليها. راجعها وتأكد أنها لا تزال تنافسية.",
+    }
+    instruction = _section_instructions.get(section, "حلّل وأعطِ توصية لكل منتج.")
+    prompt = f"{instruction}\n\nالمنتجات:\n{lines}"
     return call_ai(prompt, section)
 
 # ══ معالجة النص الملصوق ═════════════════════

@@ -342,33 +342,55 @@ def _format_new_product(p):
     """
     تحويل dict المنتج إلى التنسيق العربي الذي يتوقعه Blueprint سلة.
     يقبل المفاتيح بالعربي أو الإنجليزي ويوحّدها.
+    v21.1: يولّد SKU والوزن وسعر التكلفة تلقائياً إذا لم تُحدد.
     """
+    name = str(
+        p.get("أسم المنتج",
+        p.get("اسم المنتج",
+        p.get("product_name",
+        p.get("name", ""))))
+    )
+    price = float(
+        p.get("سعر المنتج",
+        p.get("price",
+        p.get("السعر", 0))) or 0
+    )
+
+    # SKU — توليد تلقائي إذا لم يوجد
+    sku = str(
+        p.get("رمز المنتج sku",
+        p.get("sku",
+        p.get("رمز_المنتج", "")))
+    )
+    if not sku or sku in ("", "nan", "None"):
+        brand = str(p.get("brand", p.get("الماركة", "")))
+        sku = _generate_sku(name, brand)
+
+    # الوزن — تقدير تلقائي من الحجم إذا لم يُحدد
+    weight = float(p.get("الوزن", p.get("weight", 0)) or 0)
+    if weight <= 0:
+        try:
+            from engines.engine import extract_size
+            size_ml = extract_size(name)
+            weight = _estimate_weight(size_ml)
+        except Exception:
+            weight = 300  # وزن افتراضي
+
+    # سعر التكلفة — تقدير 60% من السعر إذا لم يُحدد
+    cost = float(
+        p.get("سعر التكلفة",
+        p.get("cost_price",
+        p.get("سعر_التكلفة", 0))) or 0
+    )
+    if cost <= 0 and price > 0:
+        cost = round(price * 0.6, 2)
+
     return {
-        "أسم المنتج": str(
-            p.get("أسم المنتج",
-            p.get("اسم المنتج",
-            p.get("product_name",
-            p.get("name", ""))))
-        ),
-        "سعر المنتج": float(
-            p.get("سعر المنتج",
-            p.get("price",
-            p.get("السعر", 0))) or 0
-        ),
-        "رمز المنتج sku": str(
-            p.get("رمز المنتج sku",
-            p.get("sku",
-            p.get("رمز_المنتج", "")))
-        ),
-        "الوزن": float(
-            p.get("الوزن",
-            p.get("weight", 0)) or 0
-        ),
-        "سعر التكلفة": float(
-            p.get("سعر التكلفة",
-            p.get("cost_price",
-            p.get("سعر_التكلفة", 0))) or 0
-        ),
+        "أسم المنتج": name,
+        "سعر المنتج": price,
+        "رمز المنتج sku": sku,
+        "الوزن": weight,
+        "سعر التكلفة": cost,
         "السعر المخفض": float(
             p.get("السعر المخفض",
             p.get("sale_price",

@@ -190,15 +190,21 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
             file_name=f"{prefix}_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv", key=f"{prefix}_csv")
     with ac3:
-        if st.button("🤖 AI جماعي (أول 20)", key=f"{prefix}_bulk"):
-            with st.spinner("🤖 AI يحلل..."):
+        _bulk_labels = {"raise": "🤖 تحليل ذكي — خفض (أول 20)",
+                        "lower": "🤖 تحليل ذكي — رفع (أول 20)",
+                        "review": "🤖 تحقق جماعي (أول 20)",
+                        "approved": "🤖 مراجعة (أول 20)"}
+        if st.button(_bulk_labels.get(prefix, "🤖 AI جماعي (أول 20)"), key=f"{prefix}_bulk"):
+            with st.spinner("🤖 AI يحلل البيانات..."):
+                _section_map = {"raise": "price_raise", "lower": "price_lower",
+                                "review": "review", "approved": "approved"}
                 items = [{
                     "our": str(r.get("المنتج", "")),
                     "comp": str(r.get("منتج_المنافس", "")),
                     "our_price": safe_float(r.get("السعر", 0)),
                     "comp_price": safe_float(r.get("سعر_المنافس", 0))
                 } for _, r in filtered.head(20).iterrows()]
-                res = bulk_verify(items, prefix)
+                res = bulk_verify(items, _section_map.get(prefix, "general"))
                 st.markdown(f'<div class="ai-box">{res["response"]}</div>',
                             unsafe_allow_html=True)
     with ac4:
@@ -303,25 +309,65 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         # ── أزرار لكل منتج ─────────────────────
         b1, b2, b3, b4, b5, b6, b7, b8 = st.columns(8)
 
-        with b1:  # AI تحقق
-            if st.button("🤖 تحقق", key=f"v_{prefix}_{idx}"):
-                with st.spinner("AI..."):
-                    r = verify_match(our_name, comp_name, our_price, comp_price)
-                    if r["success"]:
-                        icon = "✅" if r.get("match") else "❌"
-                        st.info(f"{icon} {r.get('confidence',0)}% — {r.get('reason','')[:150]}")
-                    else:
-                        st.error("فشل AI")
+        with b1:  # AI تحقق ذكي حسب القسم
+            _ai_label = {"raise": "🤖 هل نخفض؟", "lower": "🤖 هل نرفع؟",
+                         "review": "🤖 هل يطابق؟", "approved": "🤖 تحقق"}.get(prefix, "🤖 تحقق")
+            if st.button(_ai_label, key=f"v_{prefix}_{idx}"):
+                with st.spinner("🤖 AI يحلل..."):
+                    if prefix == "raise":
+                        _ctx = (f"منتجنا «{our_name}» سعره {our_price:.0f} ر.س — المنافس «{comp_name}» ({comp_src}) سعره {comp_price:.0f} ر.س.\n"
+                                f"سعرنا أعلى بـ {diff:.0f} ر.س.\n"
+                                f"هل نخفض سعرنا؟ إذا نعم، ما السعر المقترح؟ إذا لا، لماذا؟")
+                        r = call_ai(_ctx, "price_raise")
+                        if r["success"]:
+                            st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
+                        else:
+                            st.error("فشل AI")
+                    elif prefix == "lower":
+                        _ctx = (f"منتجنا «{our_name}» سعره {our_price:.0f} ر.س — المنافس «{comp_name}» ({comp_src}) سعره {comp_price:.0f} ر.س.\n"
+                                f"سعرنا أقل بـ {abs(diff):.0f} ر.س = ربح ضائع.\n"
+                                f"هل نرفع سعرنا؟ ما السعر الأمثل (أقل من المنافس بـ 5-15 ر.س)؟")
+                        r = call_ai(_ctx, "price_lower")
+                        if r["success"]:
+                            st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
+                        else:
+                            st.error("فشل AI")
+                    elif prefix == "review":
+                        r = verify_match(our_name, comp_name, our_price, comp_price)
+                        if r["success"]:
+                            icon = "✅" if r.get("match") else "❌"
+                            conf = r.get("confidence", 0)
+                            reason = r.get("reason", "")[:200]
+                            suggestion = r.get("suggestion", "")
+                            st.info(f"{icon} **تطابق: {conf}%**\n\n{reason}")
+                            if suggestion:
+                                st.caption(f"💡 {suggestion}")
+                        else:
+                            st.error("فشل AI")
+                    else:  # approved
+                        r = verify_match(our_name, comp_name, our_price, comp_price)
+                        if r["success"]:
+                            icon = "✅" if r.get("match") else "❌"
+                            st.info(f"{icon} {r.get('confidence',0)}% — {r.get('reason','')[:150]}")
+                        else:
+                            st.error("فشل AI")
 
-        with b2:  # بحث سعر السوق
-            if st.button("🌐 سوق", key=f"mkt_{prefix}_{idx}"):
-                with st.spinner("يبحث..."):
+        with b2:  # بحث سعر السوق ذكي
+            _mkt_label = {"raise": "🌐 سعر عادل؟", "lower": "🌐 فرصة رفع؟"}.get(prefix, "🌐 سوق")
+            if st.button(_mkt_label, key=f"mkt_{prefix}_{idx}"):
+                with st.spinner("🌐 يبحث في السوق..."):
                     r = search_market_price(our_name, our_price)
                     if r.get("success"):
                         mp = r.get("market_price", 0)
                         rng = r.get("price_range", {})
                         rec = r.get("recommendation", "")
-                        st.info(f"💹 سعر السوق: **{mp:,.0f} ر.س** ({rng.get('min',0):.0f}–{rng.get('max',0):.0f})\n\n{rec}")
+                        _verdict = ""
+                        if prefix == "raise" and mp > 0:
+                            _verdict = f"\n\n{'✅ سعرنا ضمن السوق' if our_price <= mp * 1.1 else '⚠️ سعرنا أعلى من السوق — يُنصح بالخفض'}"
+                        elif prefix == "lower" and mp > 0:
+                            _gap = mp - our_price
+                            _verdict = f"\n\n{'💰 فرصة رفع ~' + f'{_gap:.0f} ر.س' if _gap > 10 else '✅ سعرنا قريب من السوق'}"
+                        st.info(f"💹 سعر السوق: **{mp:,.0f} ر.س** ({rng.get('min',0):.0f}–{rng.get('max',0):.0f})\n\n{rec}{_verdict}")
                     else:
                         st.warning("تعذر البحث")
 
@@ -363,8 +409,11 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
 
         with b6:  # تصدير Make
             if st.button("📤 Make", key=f"mk_{prefix}_{idx}"):
+                _pid = str(row.get("معرف_المنتج", row.get("product_id", "")))
+                _new_price = round(comp_price - 1, 2) if comp_price > 0 else our_price
                 res = send_single_product({
-                    "name": our_name, "price": our_price,
+                    "product_id": _pid,
+                    "name": our_name, "price": _new_price,
                     "comp_name": comp_name, "comp_price": comp_price,
                     "diff": diff, "decision": decision, "competitor": comp_src
                 })
@@ -674,8 +723,19 @@ elif page == "🔴 سعر أعلى":
             # AI تدريب لهذا القسم
             with st.expander("🤖 نصيحة AI لهذا القسم", expanded=False):
                 if st.button("📡 احصل على تحليل شامل للقسم", key="ai_section_raise"):
-                    with st.spinner("🤖 AI يحلل..."):
-                        r = call_ai(f"عندي {len(df)} منتج سعرنا أعلى من المنافسين. أعطني استراتيجية خفض الأسعار.", "price_raise")
+                    with st.spinner("🤖 AI يحلل البيانات الفعلية..."):
+                        _top = df.nlargest(min(15, len(df)), "الفرق") if "الفرق" in df.columns else df.head(15)
+                        _lines = "\n".join(
+                            f"- {r.get('المنتج','')}: سعرنا {safe_float(r.get('السعر',0)):.0f} | المنافس ({r.get('المنافس','')}) {safe_float(r.get('سعر_المنافس',0)):.0f} | فرق +{safe_float(r.get('الفرق',0)):.0f}"
+                            for _, r in _top.iterrows())
+                        _avg_diff = safe_float(df["الفرق"].mean()) if "الفرق" in df.columns else 0
+                        _prompt = (f"عندي {len(df)} منتج سعرنا أعلى من المنافسين.\n"
+                                   f"متوسط الفرق: {_avg_diff:.0f} ر.س\n"
+                                   f"أعلى 15 فرق:\n{_lines}\n\n"
+                                   f"أعطني:\n1. أي المنتجات يجب خفض سعرها فوراً (فرق>30)؟\n"
+                                   f"2. أي المنتجات يمكن إبقاؤها (فرق<10)؟\n"
+                                   f"3. استراتيجية تسعير مخصصة لكل ماركة")
+                        r = call_ai(_prompt, "price_raise")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
             render_pro_table(df, "raise", "update")
         else:
@@ -696,8 +756,19 @@ elif page == "🟢 سعر أقل":
             st.info(f"💰 {len(df)} منتج يمكن رفع سعره لزيادة الهامش")
             with st.expander("🤖 نصيحة AI لهذا القسم", expanded=False):
                 if st.button("📡 استراتيجية رفع الأسعار", key="ai_section_lower"):
-                    with st.spinner("🤖"):
-                        r = call_ai(f"عندي {len(df)} منتج سعرنا أقل من المنافسين. كيف أرفع الأسعار بأمان؟", "price_lower")
+                    with st.spinner("🤖 AI يحلل فرص الربح..."):
+                        _top = df.nsmallest(min(15, len(df)), "الفرق") if "الفرق" in df.columns else df.head(15)
+                        _lines = "\n".join(
+                            f"- {r.get('المنتج','')}: سعرنا {safe_float(r.get('السعر',0)):.0f} | المنافس ({r.get('المنافس','')}) {safe_float(r.get('سعر_المنافس',0)):.0f} | فرق {safe_float(r.get('الفرق',0)):.0f}"
+                            for _, r in _top.iterrows())
+                        _total_lost = safe_float(df["الفرق"].sum()) if "الفرق" in df.columns else 0
+                        _prompt = (f"عندي {len(df)} منتج سعرنا أقل من المنافسين.\n"
+                                   f"إجمالي الأرباح الضائعة: {abs(_total_lost):.0f} ر.س\n"
+                                   f"أكبر 15 فرصة ربح:\n{_lines}\n\n"
+                                   f"أعطني:\n1. أي المنتجات يمكن رفع سعرها فوراً (فرق>50)؟\n"
+                                   f"2. أي المنتجات نرفعها تدريجياً (فرق 10-50)؟\n"
+                                   f"3. كم الربح المتوقع إذا رفعنا الأسعار؟")
+                        r = call_ai(_prompt, "price_lower")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
             render_pro_table(df, "lower", "update")
         else:
@@ -738,8 +809,21 @@ elif page == "🔍 منتجات مفقودة":
             # AI للقسم
             with st.expander("🤖 نصيحة AI — أولويات الإضافة", expanded=False):
                 if st.button("📡 تحليل المنتجات المفقودة", key="ai_missing_section"):
-                    with st.spinner("🤖"):
-                        r = call_ai(f"عندي {len(df)} منتج عند المنافسين غير موجود في متجرنا مهووس. أعطني توصيات أولويات الإضافة.", "missing")
+                    with st.spinner("🤖 AI يحلل أولويات الإضافة..."):
+                        _sample = df.head(20)
+                        _brands = df["الماركة"].value_counts().head(10).to_dict() if "الماركة" in df.columns else {}
+                        _brand_summary = " | ".join(f"{b}: {c}" for b, c in _brands.items()) if _brands else "غير محدد"
+                        _lines = "\n".join(
+                            f"- {r.get('منتج_المنافس','')}: {safe_float(r.get('سعر_المنافس',0)):.0f} ر.س ({r.get('الماركة','')}) — عند {r.get('المنافس','')}"
+                            for _, r in _sample.iterrows())
+                        _prompt = (f"عندي {len(df)} منتج عند المنافسين غير موجود في متجرنا مهووس.\n"
+                                   f"توزيع الماركات: {_brand_summary}\n"
+                                   f"عينة من المنتجات:\n{_lines}\n\n"
+                                   f"أعطني:\n1. ترتيب أولويات الإضافة (عالية/متوسطة/منخفضة) مع السبب\n"
+                                   f"2. أي الماركات الأكثر أهمية للإضافة؟\n"
+                                   f"3. سعر مقترح لكل منتج (أقل من المنافس بـ 5-10 ر.س)\n"
+                                   f"4. هل هناك منتجات لا تستحق الإضافة؟")
+                        r = call_ai(_prompt, "missing")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
 
             # فلاتر
@@ -773,11 +857,7 @@ elif page == "🔍 منتجات مفقودة":
                     mime="text/csv", key="miss_csv")
             with cc3:
                 if st.button("📤 إرسال كل لـ Make", key="miss_make_all"):
-                    products = [{"name": str(r.get("منتج_المنافس","")),
-                                 "price": safe_float(r.get("سعر_المنافس",0)),
-                                 "brand": str(r.get("الماركة","")),
-                                 "competitor": str(r.get("المنافس",""))}
-                                for _, r in filtered.iterrows()]
+                    products = export_to_make_format(filtered, "missing")
                     res = send_missing_products(products)
                     st.success(res["message"]) if res["success"] else st.error(res["message"])
 
@@ -884,10 +964,15 @@ elif page == "🔍 منتجات مفقودة":
 
                 with b6:  # إضافة للـ Make
                     if st.button("📤 Make", key=f"mk_m_{idx}"):
-                        res = send_single_product(
-                            {"name": name, "price": price, "brand": brand, "competitor": comp},
-                            "new"
-                        )
+                        _size_val = extract_size(name)
+                        _size_str = f"{int(_size_val)}ml" if _size_val else str(size)
+                        _suggested_price = round(price - 1, 2) if price > 0 else 0
+                        res = send_new_products([{
+                            "أسم المنتج": name,
+                            "سعر المنتج": _suggested_price,
+                            "brand": brand,
+                            "الوصف": f"عطر {brand} {_size_str}" if brand else f"عطر {_size_str}",
+                        }])
                         st.success(res["message"]) if res["success"] else st.error(res["message"])
 
                 with b7:  # تجاهل
@@ -915,8 +1000,20 @@ elif page == "⚠️ تحت المراجعة":
             st.warning(f"⚠️ {len(df)} منتج بتطابق غير مؤكد")
             with st.expander("🤖 نصيحة AI — كيف تتعامل مع المراجعة", expanded=False):
                 if st.button("📡 تحليل قسم المراجعة", key="ai_review_section"):
-                    with st.spinner("🤖"):
-                        r = call_ai(f"عندي {len(df)} منتج بتطابق غير مؤكد. أعطني أفضل طريقة للتحقق.", "review")
+                    with st.spinner("🤖 AI يراجع المطابقات المشكوك فيها..."):
+                        _sample = df.head(15)
+                        _lines = "\n".join(
+                            f"- منتجنا: «{r.get('المنتج','')}» ↔ المنافس: «{r.get('منتج_المنافس','')}» | تطابق: {safe_float(r.get('نسبة_التطابق',0)):.0f}% | سعرنا: {safe_float(r.get('السعر',0)):.0f} | المنافس: {safe_float(r.get('سعر_المنافس',0)):.0f}"
+                            for _, r in _sample.iterrows())
+                        _avg_match = safe_float(df["نسبة_التطابق"].mean()) if "نسبة_التطابق" in df.columns else 0
+                        _prompt = (f"عندي {len(df)} منتج بتطابق غير مؤكد (متوسط التطابق {_avg_match:.0f}%).\n"
+                                   f"المنتجات:\n{_lines}\n\n"
+                                   f"لكل منتج قرّر:\n"
+                                   f"✅ متطابق (نفس المنتج بأسماء مختلفة)\n"
+                                   f"❌ غير متطابق (منتجات مختلفة)\n"
+                                   f"⚠️ يحتاج تحقق يدوي\n"
+                                   f"اشرح سبب قرارك لكل منتج.")
+                        r = call_ai(_prompt, "review")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
             render_pro_table(df, "review", "update")
         else:
