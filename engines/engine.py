@@ -609,10 +609,11 @@ _GURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flas
 
 def _ai_batch(batch):
     """
-    batch: [{"our":str, "price":float, "candidates":[...]}]
+    batch: [{"our":str, "price":float, "candidates":[...], "brand":str, "size":float, "ptype":str}]
     → [int]  (0-based index | -1=no match)
+    v21.1: برومبت محسّن + fallback آمن (-1 بدلاً من 0)
     """
-    if not GEMINI_API_KEYS or not batch: return [0]*len(batch)
+    if not GEMINI_API_KEYS or not batch: return [-1]*len(batch)
 
     # cache key
     ck = hashlib.md5(json.dumps(
@@ -623,28 +624,42 @@ def _ai_batch(batch):
 
     lines = []
     for i, it in enumerate(batch):
+        our_br = it.get("brand", "")
+        our_sz = it.get("size", 0)
+        our_tp = it.get("ptype", "")
         cands = "\n".join(
-            f"  {j+1}. {c['name']} | {int(c.get('size',0))}ml | "
-            f"{c.get('type','?')} | {c.get('gender','?')} | {c.get('price',0):.0f}ر.س"
+            f"  {j+1}. {c['name']} | ماركة:{c.get('brand','?')} | {int(c.get('size',0))}ml | "
+            f"{c.get('type','?')} | {c.get('gender','?')} | {c.get('price',0):.0f}ر.س | "
+            f"تطابق:{c.get('score',0):.0f}%"
             for j,c in enumerate(it["candidates"])
         )
-        lines.append(f"[{i+1}] منتجنا: «{it['our']}» ({it['price']:.0f}ر.س)\n{cands}")
+        lines.append(
+            f"[{i+1}] منتجنا: «{it['our']}» | ماركة:{our_br} | {int(our_sz)}ml | {our_tp} | {it['price']:.0f}ر.س\n{cands}"
+        )
 
     prompt = (
-        "خبير عطور فاخرة. لكل منتج اختر رقم المرشح المطابق تماماً أو 0 إذا لا يوجد.\n"
-        "الشروط: ✓نفس الماركة ✓نفس الحجم (±5ml) ✓نفس EDP/EDT ✓نفس الجنس إذا مذكور\n\n"
+        "أنت خبير عطور فاخرة متخصص في المطابقة الدقيقة.\n"
+        "لكل منتج اختر رقم المرشح المطابق تماماً أو 0 إذا لا يوجد مطابقة دقيقة.\n\n"
+        "الشروط الصارمة:\n"
+        "✓ نفس الماركة بالضبط (ديور≠شانيل)\n"
+        "✓ نفس خط الإنتاج (سوفاج≠هوم، هيرو≠لندن)\n"
+        "✓ نفس الحجم (±5ml فقط)\n"
+        "✓ نفس النوع EDP/EDT (إذا كلاهما محدد)\n"
+        "✓ نفس الجنس إذا مذكور (رجالي≠نسائي)\n"
+        "✗ تستر ≠ ريتيل | عينة ≠ عطر كامل | مجموعة ≠ منتج واحد\n\n"
+        "⚠️ إذا لم تكن متأكداً 100% → اختر 0 (أفضل من مطابقة خاطئة)\n\n"
         + "\n\n".join(lines)
         + f'\n\nJSON فقط: {{"results":[r1,r2,...,r{len(batch)}]}}'
     )
 
     payload = {"contents":[{"parts":[{"text":prompt}]}],
-               "generationConfig":{"temperature":0,"maxOutputTokens":200,"topP":1,"topK":1}}
+               "generationConfig":{"temperature":0,"maxOutputTokens":300,"topP":1,"topK":1}}
 
     for attempt in range(3):
         for key in GEMINI_API_KEYS:
             if not key: continue
             try:
-                r = _req.post(f"{_GURL}?key={key}", json=payload, timeout=22)
+                r = _req.post(f"{_GURL}?key={key}", json=payload, timeout=25)
                 if r.status_code == 200:
                     txt = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                     clean = re.sub(r'```json|```','',txt).strip()
@@ -653,19 +668,20 @@ def _ai_batch(batch):
                         raw = json.loads(clean[s:e]).get("results",[])
                         out = []
                         for j,it in enumerate(batch):
-                            n = raw[j] if j<len(raw) else 1
+                            n = raw[j] if j<len(raw) else 0
                             try: n=int(n)
-                            except: n=1
+                            except: n=0
                             if 1<=n<=len(it["candidates"]): out.append(n-1)
                             elif n==0: out.append(-1)
-                            else: out.append(0)
+                            else: out.append(-1)  # أي قيمة غير صالحة → لا مطابقة
                         _cset(ck, out)
                         return out
                 elif r.status_code==429:
                     time.sleep(2**attempt)
             except: continue
         time.sleep(1)
-    return [0]*len(batch)
+    # v21.1: إذا فشل AI → الكل "مراجعة" بدلاً من اختيار المرشح الأول تلقائياً
+    return [-1]*len(batch)
 
 
 # ═══════════════════════════════════════════════════════
@@ -696,26 +712,46 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
     else:
         risk = "🟢 منخفض"
 
-    # ═══ توزيع النتائج على الأقسام ═══
-    # 🔴 سعر أعلى: سعرنا أعلى من المنافس بأكثر من 10 ريال
-    # 🟢 سعر أقل: سعرنا أقل من المنافس بأكثر من 10 ريال
-    # ✅ موافق: سعرنا مناسب (فرق ≤ 10 ريال)
-    # ⚠️ مراجعة: المطابقة غير مؤكدة (ثقة منخفضة)
+    # ═══ توزيع النتائج على الأقسام v21.1 ═══
+    # المنطق الذكي:
+    #   1. مطابقة مؤكدة (AI أو score عالي جداً) → تصنيف بالسعر
+    #   2. مطابقة جيدة (score 80-91) مع فرق سعر صغير → موافق
+    #   3. مطابقة جيدة (score 80-91) مع فرق سعر كبير → تصنيف بالسعر لكن بمراجعة
+    #   4. مطابقة ضعيفة (score <80) → مراجعة
+    #   5. بدون سعر → مراجعة
     PRICE_DIFF_THRESHOLD = 10  # فرق السعر المقبول بالريال
     if override:
         dec = override
-    elif src in ("gemini","auto") or score >= HIGH_CONFIDENCE:
-        # مطابقة مؤكدة → توزيع حسب السعر
-        if our_price > 0 and cp > 0:
-            if diff > PRICE_DIFF_THRESHOLD:     dec = "🔴 سعر أعلى"
-            elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
-            else:                                dec = "✅ موافق"
-        else:
-            dec = "⚠️ مراجعة"  # لا يوجد سعر → مراجعة
-    elif score >= REVIEW_THRESHOLD:
-        # مطابقة محتملة لكن تحتاج تأكيد → تحت المراجعة
+    elif our_price <= 0 or cp <= 0:
+        # لا يوجد سعر لأحدهما → مراجعة إجبارية
         dec = "⚠️ مراجعة"
+    elif src == "gemini":
+        # AI أكّد المطابقة → تصنيف بالسعر (ثقة عالية)
+        if diff > PRICE_DIFF_THRESHOLD:     dec = "🔴 سعر أعلى"
+        elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
+        else:                                dec = "✅ موافق"
+    elif src == "auto" and score >= 97:
+        # تطابق شبه كامل (97%+) → تصنيف بالسعر
+        if diff > PRICE_DIFF_THRESHOLD:     dec = "🔴 سعر أعلى"
+        elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
+        else:                                dec = "✅ موافق"
+    elif score >= HIGH_CONFIDENCE:
+        # تطابق عالي (92-96%) بدون تأكيد AI → تصنيف بالسعر فقط إذا الفرق منطقي
+        diff_pct_check = abs((diff / cp) * 100) if cp > 0 else 0
+        if diff_pct_check > 40:
+            # فرق كبير جداً مع تطابق غير مؤكد → مراجعة
+            dec = "⚠️ مراجعة"
+        elif diff > PRICE_DIFF_THRESHOLD:     dec = "🔴 سعر أعلى"
+        elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
+        else:                                dec = "✅ موافق"
+    elif score >= 80:
+        # تطابق جيد (80-91%) → تصنيف بالسعر فقط إذا الفرق صغير
+        if abs(diff) <= PRICE_DIFF_THRESHOLD:
+            dec = "✅ موافق"  # فرق قليل + تطابق معقول = موافق
+        else:
+            dec = "⚠️ مراجعة"  # فرق كبير + تطابق غير مؤكد = مراجعة
     else:
+        # تطابق ضعيف (<80%) → مراجعة
         dec = "⚠️ مراجعة"
 
     ai_lbl = {"gemini":f"🤖✅({score:.0f}%)",
@@ -772,11 +808,20 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
         if not pending: return
         idxs = _ai_batch(pending)
         for j, it in enumerate(pending):
-            ci = idxs[j] if j<len(idxs) else 0
+            ci = idxs[j] if j<len(idxs) else -1
             if ci < 0:
-                results.append(_row(it["product"],it["our_price"],it["our_id"],
-                                    it["brand"],it["size"],it["ptype"],it["gender"],
-                                    None,"🔵 مفقود عند المنافس","gemini_no_match"))
+                # AI رفض كل المرشحين أو فشل
+                # إذا كان أفضل مرشح score ≥ 80 → مراجعة (ليس مفقود)
+                top_cand = it["candidates"][0] if it["candidates"] else None
+                if top_cand and top_cand.get("score", 0) >= 80:
+                    results.append(_row(it["product"],it["our_price"],it["our_id"],
+                                        it["brand"],it["size"],it["ptype"],it["gender"],
+                                        top_cand,"⚠️ مراجعة","gemini_no_match",
+                                        all_cands=it["all_cands"]))
+                else:
+                    results.append(_row(it["product"],it["our_price"],it["our_id"],
+                                        it["brand"],it["size"],it["ptype"],it["gender"],
+                                        None,"🔵 مفقود عند المنافس","gemini_no_match"))
             else:
                 best = it["candidates"][ci]
                 results.append(_row(it["product"],it["our_price"],it["our_id"],
@@ -823,11 +868,12 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
             results.append(_row(product,our_price,our_id,brand,size,ptype,gender,
                                 best0,src="auto",all_cands=all_cands))
         else:
-            # غامض → AI batch
+            # غامض → AI batch (مع سياق كامل)
             pending.append(dict(product=product,our_price=our_price,our_id=our_id,
                                 brand=brand,size=size,ptype=ptype,gender=gender,
                                 candidates=top5,all_cands=all_cands,
-                                our=product,price=our_price))
+                                our=product,price=our_price,
+                                our_pline=our_pl))
             if len(pending) >= BATCH: _flush()
 
         if progress_callback: progress_callback((i+1)/total)
