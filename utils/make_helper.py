@@ -1,16 +1,15 @@
 """
-make_helper.py - أتمتة Make.com v21.0 (إصلاح product_id)
+make_helper.py - أتمتة Make.com v22.0
 ═══════════════════════════════════════════════════════
-الإصلاحات في v21:
-  1. إزالة شرط product_id الإجباري — التطبيق يعمل حتى بدون معرّف
-  2. إذا وُجد product_id → يُرسل مباشرة لتحديث المنتج في سلة
-  3. إذا لم يوجد product_id → يُرسل الاسم فقط ويُنبّه المستخدم
-  4. تحسين استخراج product_id من كل أسماء الأعمدة الممكنة في ملف سلة
-  5. إرسال دفعات (batches) لتجنب timeout
-  6. إعادة المحاولة (retry) مع تأخير تصاعدي
+الجديد في v22:
+  1. UTF-8 صارم في جميع الإرساليات (العربية لا تنكسر في Make/سلة)
+  2. SKU عشوائي MAH-XXXXXX للمنتجات الجديدة/المفقودة
+  3. image_url في حمولة المنتجات الجديدة
+  4. الوزن التلقائي: (size_ml × 1.2) + 150
+  5. سعر التكلفة التلقائي: price × 0.6
 ═══════════════════════════════════════════════════════
 """
-import requests, json, time, math
+import requests, json, time, math, uuid
 from datetime import datetime
 from config import WEBHOOK_UPDATE_PRICES, WEBHOOK_NEW_PRODUCTS
 
@@ -29,16 +28,19 @@ TIMEOUT        = 30          # timeout بالثواني
 # ══════════════════════════════════════════════════════
 def _post_with_retry(url, payload, timeout=TIMEOUT):
     """
-    إرسال POST مع إعادة المحاولة عند الفشل.
+    إرسال POST مع UTF-8 صارم وإعادة المحاولة عند الفشل.
+    يُشفّر JSON يدوياً بـ ensure_ascii=False لحماية النص العربي في Make/سلة.
     يرجع dict: {success, status_code, message, response_data}
     """
     last_error = ""
     for attempt in range(MAX_RETRIES):
         try:
+            # UTF-8 صارم — العربية لا تُحوَّل إلى \uXXXX
+            encoded_payload = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             resp = requests.post(
                 url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
+                data=encoded_payload,
+                headers={"Content-Type": "application/json; charset=utf-8"},
                 timeout=timeout
             )
             if resp.status_code == 200:
@@ -356,15 +358,14 @@ def _format_new_product(p):
         p.get("السعر", 0))) or 0
     )
 
-    # SKU — توليد تلقائي إذا لم يوجد
+    # SKU — توليد عشوائي فريد MAH-XXXXXX إذا لم يوجد
     sku = str(
         p.get("رمز المنتج sku",
         p.get("sku",
         p.get("رمز_المنتج", "")))
     )
     if not sku or sku in ("", "nan", "None"):
-        brand = str(p.get("brand", p.get("الماركة", "")))
-        sku = _generate_sku(name, brand)
+        sku = f"MAH-{uuid.uuid4().hex[:6].upper()}"
 
     # الوزن — تقدير تلقائي من الحجم إذا لم يُحدد
     weight = float(p.get("الوزن", p.get("weight", 0)) or 0)
@@ -386,20 +387,18 @@ def _format_new_product(p):
         cost = round(price * 0.6, 2)
 
     return {
-        "أسم المنتج": name,
-        "سعر المنتج": price,
+        "أسم المنتج":     name,
+        "سعر المنتج":     price,
         "رمز المنتج sku": sku,
-        "الوزن": weight,
-        "سعر التكلفة": cost,
-        "السعر المخفض": float(
+        "الوزن":          weight,
+        "سعر التكلفة":    cost,
+        "السعر المخفض":   float(
             p.get("السعر المخفض",
             p.get("sale_price",
             p.get("السعر_المخفض", 0))) or 0
         ),
-        "الوصف": str(
-            p.get("الوصف",
-            p.get("description", ""))
-        ),
+        "الوصف":    str(p.get("الوصف", p.get("description", ""))),
+        "image_url": str(p.get("image_url", p.get("صورة", ""))),
     }
 
 
@@ -534,59 +533,71 @@ def export_to_make_format(df, section_type="update"):
             }
             products.append(product)
 
-        # ─── منتجات مفقودة (تُضاف كجديدة) ───
+        # ─── منتجات مفقودة (تُضاف كجديدة في سلة) ───
         elif section_type == "missing":
-            pname = str(row.get("منتج_المنافس", ""))
+            pname      = str(row.get("منتج_المنافس", ""))
             comp_price = float(row.get("سعر_المنافس", 0) or 0)
-            brand = str(row.get("الماركة", "")) or extract_brand(pname)
-            size_val = extract_size(pname)
-            size_str = f"{int(size_val)}ml" if size_val else str(row.get("الحجم", ""))
+            brand      = str(row.get("الماركة", "")) or extract_brand(pname)
+            size_val   = extract_size(pname) or 0
+            size_str   = f"{int(size_val)}ml" if size_val else str(row.get("الحجم", ""))
+            image_url  = str(row.get("image_url", row.get("صورة", "")))
 
+            # وصف أساسي من البيانات المتوفرة
             desc_parts = [f"عطر {brand}" if brand else "عطر"]
-            if size_str:
-                desc_parts.append(size_str)
+            if size_str: desc_parts.append(size_str)
             ptype = classify_product(pname)
-            if ptype == "tester":
-                desc_parts.append("تستر")
-            description = " ".join(desc_parts)
+            if ptype == "tester": desc_parts.append("تستر")
+            description = str(row.get("الوصف", "")) or " ".join(desc_parts)
 
-            sku = _generate_sku(pname, brand)
+            # SKU عشوائي فريد بصيغة MAH-XXXXXX
+            sku = f"MAH-{uuid.uuid4().hex[:6].upper()}"
+
+            # سعر البيع = سعر المنافس - 1 | التكلفة = 60% | الوزن = size×1.2+150
+            sale_price = round(comp_price - 1, 2) if comp_price > 0 else 0
+            cost_price = round(comp_price * 0.6, 2) if comp_price > 0 else 0
+            weight     = int(size_val * 1.2 + 150) if size_val > 0 else 300
 
             product = {
-                "أسم المنتج": pname,
-                "سعر المنتج": round(comp_price - 1, 2) if comp_price > 0 else 0,
-                "رمز المنتج sku": sku,
-                "الوزن": _estimate_weight(size_val),
-                "سعر التكلفة": round(comp_price * 0.6, 2) if comp_price > 0 else 0,
-                "السعر المخفض": 0,
-                "الوصف": description,
+                "أسم المنتج":      pname,
+                "سعر المنتج":      sale_price,
+                "رمز المنتج sku":  sku,
+                "الوزن":           weight,
+                "سعر التكلفة":     cost_price,
+                "السعر المخفض":    0,
+                "الوصف":           description,
+                "image_url":       image_url,
             }
             products.append(product)
 
         # ─── منتجات جديدة (من قسم سعر أقل) ───
         else:
-            pname = str(row.get("المنتج", row.get("منتج_المنافس", "")))
+            pname      = str(row.get("المنتج", row.get("منتج_المنافس", "")))
             comp_price = float(row.get("سعر_المنافس", 0) or 0)
-            our_price = float(row.get("السعر", 0) or 0)
-            brand = str(row.get("الماركة", "")) or extract_brand(pname)
-            size_val = extract_size(pname)
-            size_str = f"{int(size_val)}ml" if size_val else str(row.get("الحجم", ""))
+            our_price  = float(row.get("السعر", 0) or 0)
+            brand      = str(row.get("الماركة", "")) or extract_brand(pname)
+            size_val   = extract_size(pname) or 0
+            size_str   = f"{int(size_val)}ml" if size_val else str(row.get("الحجم", ""))
+            image_url  = str(row.get("image_url", row.get("صورة", "")))
 
             desc_parts = [f"عطر {brand}" if brand else "عطر"]
-            if size_str:
-                desc_parts.append(size_str)
-            description = " ".join(desc_parts)
+            if size_str: desc_parts.append(size_str)
+            description = str(row.get("الوصف", "")) or " ".join(desc_parts)
 
-            sku = _generate_sku(pname, brand)
+            # SKU عشوائي فريد
+            sku = f"MAH-{uuid.uuid4().hex[:6].upper()}"
+
+            cost_price = round(comp_price * 0.6, 2) if comp_price > 0 else round(our_price * 0.6, 2)
+            weight     = int(size_val * 1.2 + 150) if size_val > 0 else 300
 
             product = {
-                "أسم المنتج": pname,
-                "سعر المنتج": round(our_price if our_price > 0 else (comp_price - 1), 2),
+                "أسم المنتج":     pname,
+                "سعر المنتج":     round(our_price if our_price > 0 else (comp_price - 1), 2),
                 "رمز المنتج sku": sku,
-                "الوزن": _estimate_weight(size_val),
-                "سعر التكلفة": round(comp_price * 0.6, 2) if comp_price > 0 else 0,
-                "السعر المخفض": 0,
-                "الوصف": description,
+                "الوزن":          weight,
+                "سعر التكلفة":    cost_price,
+                "السعر المخفض":   0,
+                "الوصف":          description,
+                "image_url":      image_url,
             }
             products.append(product)
 
