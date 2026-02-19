@@ -68,7 +68,28 @@ except:
 WORD_REPLACEMENTS = {}
 MATCH_THRESHOLD = 85; HIGH_CONFIDENCE = 95; REVIEW_THRESHOLD = 75
 PRICE_TOLERANCE = 5; TESTER_KEYWORDS = ["tester","تستر"]; SET_KEYWORDS = ["set","طقم","مجموعة"]
-GEMINI_API_KEYS = []
+
+# ─── قراءة مفاتيح Gemini من Railway Environment Variables ───
+import os as _os
+def _load_gemini_keys():
+    keys = []
+    # طريقة 1: GEMINI_API_KEYS مفصولة بفاصلة
+    v = _os.environ.get("GEMINI_API_KEYS", "")
+    if v:
+        keys += [k.strip() for k in v.split(",") if k.strip()]
+    # طريقة 2: مفاتيح منفردة GEMINI_KEY_1, GEMINI_KEY_2 ...
+    for i in range(1, 10):
+        k = _os.environ.get(f"GEMINI_KEY_{i}", "")
+        if k.strip():
+            keys.append(k.strip())
+    # طريقة 3: أسماء بديلة
+    for env_name in ["GEMINI_API_KEY", "GEMINI_KEY"]:
+        k = _os.environ.get(env_name, "")
+        if k.strip():
+            keys.append(k.strip())
+    return list(dict.fromkeys(keys))  # إزالة التكرار مع الحفاظ على الترتيب
+
+GEMINI_API_KEYS = _load_gemini_keys()
 
 # ─── مرادفات ذكية للعطور ────────────────────
 _SYN = {
