@@ -693,7 +693,7 @@ def _ai_batch(batch):
                         return out
                 elif r.status_code==429:
                     time.sleep(2**attempt)
-            except (requests.RequestException, json.JSONDecodeError, Exception):
+            except (_req.RequestException, json.JSONDecodeError, Exception):
                 continue
         time.sleep(1)
     # v21.1: إذا فشل AI → الكل "مراجعة" بدلاً من اختيار المرشح الأول تلقائياً
@@ -859,9 +859,9 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
             continue
 
         our_price = 0.0
-        if our_price_col:
+        if our_price_col and our_price_col in row.index:
             try: our_price = float(str(row[our_price_col]).replace(",",""))
-            except (ValueError, TypeError): pass
+            except (ValueError, TypeError, KeyError): pass
 
         our_id  = _pid(row, our_id_col)
         brand   = extract_brand(product)

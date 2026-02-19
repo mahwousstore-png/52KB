@@ -152,33 +152,41 @@ def upsert_price_history(product_name, competitor, price,
     يرجع True إذا تغير السعر عن آخر تسجيل.
     """
     conn = get_db()
-    today = _date()
+    try:
+        today = _date()
 
-    # آخر سعر مسجل لهذا المنتج/المنافس
-    last = conn.execute(
-        """SELECT price, date FROM price_history
-           WHERE product_name=? AND competitor=?
-           ORDER BY id DESC LIMIT 1""",
-        (product_name, competitor)
-    ).fetchone()
+        # آخر سعر مسجل لهذا المنتج/المنافس
+        last = conn.execute(
+            """SELECT price, date FROM price_history
+               WHERE product_name=? AND competitor=?
+               ORDER BY id DESC LIMIT 1""",
+            (product_name, competitor)
+        ).fetchone()
 
-    price_changed = False
-    if last:
-        last_price = last["price"]
-        last_date  = last["date"]
-        price_changed = abs(float(price) - float(last_price)) > 0.01
+        price_changed = False
+        if last:
+            last_price = last["price"]
+            last_date  = last["date"]
+            price_changed = abs(float(price) - float(last_price)) > 0.01
 
-        if last_date == today:
-            # نفس اليوم → حدّث فقط
-            conn.execute(
-                """UPDATE price_history SET price=?,our_price=?,diff=?,
-                   match_score=?,decision=?,product_id=?
-                   WHERE product_name=? AND competitor=? AND date=?""",
-                (price, our_price, diff, match_score, decision,
-                 product_id, product_name, competitor, today)
-            )
+            if last_date == today:
+                conn.execute(
+                    """UPDATE price_history SET price=?,our_price=?,diff=?,
+                       match_score=?,decision=?,product_id=?
+                       WHERE product_name=? AND competitor=? AND date=?""",
+                    (price, our_price, diff, match_score, decision,
+                     product_id, product_name, competitor, today)
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO price_history
+                       (date,product_name,competitor,price,our_price,diff,
+                        match_score,decision,product_id)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                    (today, product_name, competitor, price, our_price,
+                     diff, match_score, decision, product_id)
+                )
         else:
-            # يوم جديد → أضف سجل
             conn.execute(
                 """INSERT INTO price_history
                    (date,product_name,competitor,price,our_price,diff,
@@ -187,19 +195,13 @@ def upsert_price_history(product_name, competitor, price,
                 (today, product_name, competitor, price, our_price,
                  diff, match_score, decision, product_id)
             )
-    else:
-        # أول مرة
-        conn.execute(
-            """INSERT INTO price_history
-               (date,product_name,competitor,price,our_price,diff,
-                match_score,decision,product_id)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
-            (today, product_name, competitor, price, our_price,
-             diff, match_score, decision, product_id)
-        )
 
-    conn.commit(); conn.close()
-    return price_changed
+        conn.commit()
+        return price_changed
+    except (sqlite3.Error, Exception):
+        return False
+    finally:
+        conn.close()
 
 
 def get_price_history(product_name, competitor="", limit=30):
@@ -254,18 +256,23 @@ def get_price_changes(days=7):
 def save_job_progress(job_id, total, processed, results, status="running",
                       our_file="", comp_files=""):
     conn = get_db()
-    conn.execute(
-        """INSERT OR REPLACE INTO job_progress
-           (job_id,started_at,updated_at,status,total,processed,
-            results_json,our_file,comp_files)
-           VALUES (?,
-               COALESCE((SELECT started_at FROM job_progress WHERE job_id=?), ?),
-               ?, ?, ?, ?, ?, ?, ?)""",
-        (job_id, job_id, _ts(), _ts(), status, total, processed,
-         json.dumps(results, ensure_ascii=False, default=str),
-         our_file, comp_files)
-    )
-    conn.commit(); conn.close()
+    try:
+        conn.execute(
+            """INSERT OR REPLACE INTO job_progress
+               (job_id,started_at,updated_at,status,total,processed,
+                results_json,our_file,comp_files)
+               VALUES (?,
+                   COALESCE((SELECT started_at FROM job_progress WHERE job_id=?), ?),
+                   ?, ?, ?, ?, ?, ?, ?)""",
+            (job_id, job_id, _ts(), _ts(), status, total, processed,
+             json.dumps(results, ensure_ascii=False, default=str),
+             our_file, comp_files)
+        )
+        conn.commit()
+    except (sqlite3.Error, Exception):
+        pass
+    finally:
+        conn.close()
 
 
 def get_job_progress(job_id):

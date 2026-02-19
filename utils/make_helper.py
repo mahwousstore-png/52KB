@@ -122,6 +122,9 @@ def send_price_updates(products, webhook_url=None):
     v21: لا يمنع الإرسال إذا لم يوجد product_id — يُنبّه فقط
     """
     url = webhook_url or WEBHOOK_UPDATE_PRICES
+    if not url or not url.startswith("http"):
+        return {"success": False, "status_code": 0,
+                "message": "❌ رابط Webhook غير صالح — تأكد من إعدادات Make.com"}
     if not products:
         return {"success": False, "status_code": 0,
                 "message": "لا توجد منتجات للإرسال"}
@@ -290,6 +293,9 @@ def send_new_products(products, webhook_url=None):
       - السعر المخفض أو sale_price  : سعر التخفيض (اختياري)
     """
     url = webhook_url or WEBHOOK_NEW_PRODUCTS
+    if not url or not url.startswith("http"):
+        return {"success": False, "status_code": 0,
+                "message": "❌ رابط Webhook غير صالح — تأكد من إعدادات Make.com"}
     if not products:
         return {"success": False, "status_code": 0,
                 "message": "لا توجد منتجات للإرسال"}

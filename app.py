@@ -214,13 +214,19 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                     "comp_price": safe_float(r.get("سعر_المنافس", 0))
                 } for _, r in filtered.head(20).iterrows()]
                 res = bulk_verify(items, _section_map.get(prefix, "general"))
-                st.markdown(f'<div class="ai-box">{res["response"]}</div>',
-                            unsafe_allow_html=True)
+                if res and res.get("success", False):
+                    st.markdown(f'<div class="ai-box">{res.get("response", "")}</div>',
+                                unsafe_allow_html=True)
+                else:
+                    st.error(res.get("response", "فشل التحليل") if res else "فشل الاتصال بـ AI")
     with ac4:
         if st.button("📤 إرسال كل لـ Make", key=f"{prefix}_make_all"):
             products = export_to_make_format(filtered, section_type)
             res = send_price_updates(products) if section_type == "update" else send_new_products(products)
-            st.success(res["message"]) if res["success"] else st.error(res["message"])
+            if res and res.get("success"):
+                st.success(res.get("message", "تم الإرسال"))
+            else:
+                st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
     with ac5:
         # جمع القرارات المعلقة وإرسالها
         pending = {k: v for k, v in st.session_state.decisions_pending.items()
@@ -448,7 +454,10 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                     "comp_name": comp_name, "comp_price": comp_price,
                     "diff": diff, "decision": decision, "competitor": comp_src
                 })
-                st.success(f"✅ {res['message']} (ID: {our_pid or 'N/A'})") if res["success"] else st.error(res["message"])
+                if res and res.get("success"):
+                    st.success(f"✅ {res.get('message', 'تم')} (ID: {our_pid or 'N/A'})")
+                else:
+                    st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
 
         with b7:  # تحقق AI
             if st.button("🔍 تحقق", key=f"vrf_{prefix}_{idx}"):
@@ -1035,7 +1044,10 @@ elif page == "🔍 منتجات مفقودة":
                             _p["image_url"] = st.session_state.product_images[_pn]
                     res = send_missing_products(products)
                     _enrich_note = f" | {_enriched} منتج مع وصف/صورة" if _enriched else ""
-                    st.success(res["message"] + _enrich_note) if res["success"] else st.error(res["message"])
+                    if res and res.get("success"):
+                        st.success(res.get("message", "تم الإرسال") + _enrich_note)
+                    else:
+                        st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
 
             st.caption(f"{len(filtered)} منتج — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
@@ -1175,7 +1187,10 @@ elif page == "🔍 منتجات مفقودة":
                         if _saved_desc:  _extras.append("وصف ✅")
                         if _saved_image: _extras.append("صورة ✅")
                         _note = f" ({', '.join(_extras)})" if _extras else " (بدون وصف/صورة)"
-                        st.success(res["message"] + _note) if res["success"] else st.error(res["message"])
+                        if res and res.get("success"):
+                            st.success(res.get("message", "تم الإرسال") + _note)
+                        else:
+                            st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
 
                 with b7:  # تجاهل
                     if st.button("🗑️ تجاهل", key=f"ign_{idx}"):
@@ -1600,7 +1615,10 @@ elif page == "⚡ أتمتة Make":
                             "منتجات جديدة": send_new_products,
                             "مفقودة": send_missing_products}
                     res = func[wh](products)
-                    st.success(res["message"]) if res["success"] else st.error(res["message"])
+                    if res and res.get("success"):
+                        st.success(res.get("message", "تم الإرسال"))
+                    else:
+                        st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
 
     with tab3:
         pending = st.session_state.decisions_pending
@@ -1618,9 +1636,12 @@ elif page == "⚡ أتمتة Make":
                 if st.button("📤 إرسال كل القرارات لـ Make"):
                     to_send = [{"name": k, **v} for k, v in pending.items()]
                     res = send_price_updates(to_send)
-                    st.success(res["message"])
-                    st.session_state.decisions_pending = {}
-                    st.rerun()
+                    if res and res.get("success"):
+                        st.success(res.get("message", "تم الإرسال"))
+                        st.session_state.decisions_pending = {}
+                        st.rerun()
+                    else:
+                        st.error(res.get("message", "فشل الإرسال") if res else "فشل الاتصال بـ Make.com")
             with c2:
                 if st.button("🗑️ مسح القرارات"):
                     st.session_state.decisions_pending = {}
