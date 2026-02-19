@@ -1,5 +1,5 @@
 """
-engines/engine.py  v21.0 — محرك المطابقة الفائق السرعة
+engines/engine.py  v22.0 — محرك المطابقة الفائق السرعة
 ═══════════════════════════════════════════════════════
 🚀 تطبيع مسبق (Pre-normalize) → vectorized cdist → Gemini للغموض فقط
 ⚡ 5x أسرع من v20 مع نفس الدقة 99.5%
@@ -272,9 +272,19 @@ def extract_type(text):
 
 def extract_gender(text):
     if not isinstance(text, str): return ""
-    tl = text.lower()
-    m = any(k in tl for k in ["pour homme","for men"," men "," man ","رجالي","للرجال"," مان "," هوم ","homme"," uomo"])
-    w = any(k in tl for k in ["pour femme","for women","women"," woman ","نسائي","للنساء","النسائي","lady","femme"," donna"])
+    tl = " " + text.lower() + " "
+    # كلمات الذكور — شاملة لاصطلاحات السوق السعودي
+    m = any(k in tl for k in [
+        "pour homme","for men"," men "," man ","رجالي","للرجال"," مان "," هوم ",
+        "homme"," uomo","for mans"," mans ","mans ","for man ","رجال ",
+        "masculine","masculin"," him "," his "
+    ])
+    # كلمات الإناث
+    w = any(k in tl for k in [
+        "pour femme","for women","women"," woman ","نسائي","للنساء",
+        "النسائي","lady","femme"," donna","for her","her ","feminine",
+        "féminin","نسائية"," هر ","لها"
+    ])
     if m and not w: return "رجالي"
     if w and not m: return "نسائي"
     return ""
@@ -888,15 +898,42 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
 
 
 # ═══════════════════════════════════════════════════════
-#  المنتجات المفقودة
+#  المنتجات المفقودة — v22.0 بالغرامات الذكية
 # ═══════════════════════════════════════════════════════
 def find_missing_products(our_df, comp_dfs):
-    our_col  = _fcol(our_df, ["المنتج","اسم المنتج","Product","Name","name"])
-    our_norms = [normalize(str(r.get(our_col,"")))
-                 for _,r in our_df.iterrows()
-                 if not is_sample(str(r.get(our_col,"")))]
+    """
+    يكتشف المنتجات الموجودة عند المنافسين وغير موجودة في متجرنا.
+    يستخدم مطابقة بالغرامات (عقوبات) لتجنب الإيجابيات الكاذبة:
+    - عقوبة فرق الحجم
+    - عقوبة اختلاف النوع (EDP/EDT)
+    - عقوبة اختلاف الجنس
+    - عقوبة اختلاف خط الإنتاج
+    """
+    # ── تحضير بيانات متجرنا مسبقاً ──────────────
+    our_col = _fcol(our_df, ["المنتج","اسم المنتج","Product","Name","name"])
+    our_items = []
+    for _, r in our_df.iterrows():
+        raw = str(r.get(our_col, "")).strip()
+        if not raw or is_sample(raw): continue
+        norm_val = normalize(raw)
+        if not norm_val: continue
+        our_items.append({
+            "raw": raw,
+            "norm": norm_val,
+            "brand": (extract_brand(raw) or "").lower(),
+            "pline": extract_product_line(raw, extract_brand(raw)),
+            "size":  extract_size(raw) or 0,
+            "type":  (extract_type(raw) or "").lower(),
+            "gender": extract_gender(raw),
+        })
+
+    if not our_items:
+        return pd.DataFrame()
+
+    our_norms = [x["norm"] for x in our_items]
 
     missing, seen = [], set()
+
     for cname, cdf in comp_dfs.items():
         ccol = _fcol(cdf, ["المنتج","اسم المنتج","Product","Name","name"])
         icol = _fcol(cdf, [
@@ -905,23 +942,83 @@ def find_missing_products(our_df, comp_dfs):
             "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
             "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
         ])
+
         for _, row in cdf.iterrows():
-            cp = str(row.get(ccol,"")).strip()
-            if not cp or is_sample(cp): continue
-            cn = normalize(cp)
-            if not cn or cn in seen: continue
-            match = rf_process.extractOne(cn, our_norms, scorer=fuzz.token_sort_ratio, score_cutoff=70)
-            if match: continue
-            seen.add(cn)
-            sz = extract_size(cp)
-            missing.append({
-                "منتج_المنافس": cp, "معرف_المنافس": _pid(row,icol),
-                "سعر_المنافس": _price(row), "المنافس": cname,
-                "الماركة": extract_brand(cp),
-                "الحجم": f"{int(sz)}ml" if sz else "",
-                "النوع": extract_type(cp), "الجنس": extract_gender(cp),
-                "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
-            })
+            cp_raw = str(row.get(ccol, "")).strip()
+            if not cp_raw or is_sample(cp_raw): continue
+            cp_norm = normalize(cp_raw)
+            if not cp_norm or cp_norm in seen: continue
+
+            # ── استخراج صفات المنتج المنافس ──────────
+            cp_brand  = (extract_brand(cp_raw) or "").lower()
+            cp_pline  = extract_product_line(cp_raw, extract_brand(cp_raw))
+            cp_size   = extract_size(cp_raw) or 0
+            cp_type   = (extract_type(cp_raw) or "").lower()
+            cp_gender = extract_gender(cp_raw)
+
+            # ── تصفية المرشحين بالماركة أولاً (أسرع) ──
+            if cp_brand:
+                candidates = [x for x in our_items if x["brand"] == cp_brand]
+                cand_norms = [x["norm"] for x in candidates]
+            else:
+                candidates = our_items
+                cand_norms = our_norms
+
+            # ── بحث أفضل 3 مطابقات ──────────────────
+            if not cand_norms:
+                # لا يوجد منتجات بهذه الماركة → مفقود مؤكد
+                found = False
+            else:
+                matches = rf_process.extract(
+                    cp_norm, cand_norms,
+                    scorer=fuzz.token_sort_ratio,
+                    limit=3, score_cutoff=55
+                )
+                found = False
+                for match_str, match_score, match_idx in matches:
+                    our_item = candidates[match_idx]
+                    penalty = 0
+
+                    # عقوبة فرق الحجم
+                    if cp_size and our_item["size"]:
+                        sz_diff = abs(cp_size - our_item["size"])
+                        if sz_diff > 30:    penalty += 30
+                        elif sz_diff > 10:  penalty += 20
+
+                    # عقوبة اختلاف النوع (EDP vs EDT)
+                    if cp_type and our_item["type"] and cp_type != our_item["type"]:
+                        penalty += 15
+
+                    # عقوبة اختلاف الجنس
+                    if cp_gender and our_item["gender"] and cp_gender != our_item["gender"]:
+                        penalty += 25
+
+                    # عقوبة اختلاف خط الإنتاج
+                    if cp_pline and our_item["pline"]:
+                        pline_score = fuzz.token_sort_ratio(cp_pline, our_item["pline"])
+                        if pline_score < 75:
+                            penalty += 20
+
+                    effective_score = match_score - penalty
+                    if effective_score >= 68:
+                        found = True
+                        break
+
+            if not found:
+                seen.add(cp_norm)
+                sz = cp_size
+                missing.append({
+                    "منتج_المنافس": cp_raw,
+                    "معرف_المنافس": _pid(row, icol),
+                    "سعر_المنافس": _price(row),
+                    "المنافس": cname,
+                    "الماركة": extract_brand(cp_raw),
+                    "الحجم": f"{int(sz)}ml" if sz else "",
+                    "النوع": extract_type(cp_raw),
+                    "الجنس": cp_gender,
+                    "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
+                })
+
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 
 

@@ -257,6 +257,16 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         risk       = str(row.get("الخطورة", ""))
         decision   = str(row.get("القرار", ""))
         ts_now     = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # رقم المنتج — يدعم أسماء عمود متعددة
+        our_pid    = str(row.get("معرف_المنتج",
+                         row.get("رقم_المنتج",
+                         row.get("رقم المنتج",
+                         row.get("product_id", ""))))).strip()
+        our_pid    = "" if our_pid in ("nan", "None", "0", "0.0") else our_pid
+        # رقم المنتج المنافس
+        comp_pid   = str(row.get("معرف_المنافس",
+                         row.get("product_id_comp", ""))).strip()
+        comp_pid   = "" if comp_pid in ("nan", "None", "0", "0.0") else comp_pid
 
         # بطاقة VS
         st.markdown(vs_card(our_name, our_price, comp_name,
@@ -284,10 +294,13 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         pend = st.session_state.decisions_pending.get(our_name, {})
         pend_html = decision_badge(pend.get("action", "")) if pend else ""
 
+        pid_html = (f'<span style="color:#4a9eff;font-size:.7rem;background:#4a9eff18;'
+                    f'padding:1px 6px;border-radius:4px;font-family:monospace">#{our_pid}</span>'
+                    if our_pid else "")
         st.markdown(f"""
         <div style="display:flex;justify-content:space-between;align-items:center;
                     padding:3px 12px;font-size:.8rem;flex-wrap:wrap;gap:4px;">
-          <span>🏷️ <b>{brand}</b> {size} {ptype}</span>
+          <span>🏷️ <b>{brand}</b> {size} {ptype} {pid_html}</span>
           <span>تطابق: <b style="color:{match_color}">{match_pct:.0f}%</b></span>
           {risk_html}
           {price_change_html}
@@ -408,17 +421,19 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                              "إزالة", our_price, comp_price, diff, comp_src)
                 st.error("🗑️")
 
-        with b6:  # تصدير Make
+        with b6:  # تصدير Make — يرسل رقم المنتج الصحيح
             if st.button("📤 Make", key=f"mk_{prefix}_{idx}"):
-                _pid = str(row.get("معرف_المنتج", row.get("product_id", "")))
+                # our_pid محدّد أعلاه بعد تنظيف جميع الصيغ الممكنة
                 _new_price = round(comp_price - 1, 2) if comp_price > 0 else our_price
+                if not our_pid:
+                    st.warning("⚠️ لا يوجد رقم منتج — يُرسل باسم المنتج")
                 res = send_single_product({
-                    "product_id": _pid,
+                    "product_id": our_pid,
                     "name": our_name, "price": _new_price,
                     "comp_name": comp_name, "comp_price": comp_price,
                     "diff": diff, "decision": decision, "competitor": comp_src
                 })
-                st.success(res["message"]) if res["success"] else st.error(res["message"])
+                st.success(f"✅ {res['message']} (ID: {our_pid or 'N/A'})") if res["success"] else st.error(res["message"])
 
         with b7:  # تحقق AI
             if st.button("🔍 تحقق", key=f"vrf_{prefix}_{idx}"):
@@ -603,6 +618,45 @@ elif page == "📂 رفع الملفات":
                                    type=["csv","xlsx","xls"],
                                    accept_multiple_files=True, key="comp_files")
 
+    # ── معاينة الملف + تحقق يدوي من الأعمدة ───────────────────
+    if our_file:
+        _prev_df, _prev_err = read_file(our_file)
+        our_file.seek(0)  # إعادة ضبط المؤشر بعد القراءة
+        if not _prev_err and not _prev_df.empty:
+            with st.expander("🔍 معاينة ملفنا + اختيار الأعمدة", expanded=True):
+                _pcols = st.columns(3)
+                # عمود اسم المنتج
+                _name_opts = ["تلقائي"] + list(_prev_df.columns)
+                _pid_opts  = ["تلقائي (لا يوجد)"] + list(_prev_df.columns)
+                _pr_opts   = ["تلقائي"] + list(_prev_df.columns)
+                with _pcols[0]:
+                    _manual_name = st.selectbox("📛 عمود اسم المنتج", _name_opts, key="manual_name_col")
+                with _pcols[1]:
+                    _manual_pid  = st.selectbox("🔢 عمود رقم المنتج", _pid_opts,  key="manual_pid_col")
+                with _pcols[2]:
+                    _manual_pr   = st.selectbox("💰 عمود السعر",      _pr_opts,   key="manual_price_col")
+
+                # تطبيق إعادة التسمية اليدوية
+                if _manual_pid != "تلقائي (لا يوجد)":
+                    st.success(f"✅ رقم المنتج → عمود **{_manual_pid}**")
+                    # تخزين في session لاستخدامه لاحقاً
+                    st.session_state["manual_pid_col_name"] = _manual_pid
+                else:
+                    # تخمين تلقائي
+                    _auto_pid = next((c for c in _prev_df.columns
+                                      if any(k in str(c).lower() for k in
+                                             ["رقم","معرف","sku","id","code","barcode","الباركود"])), None)
+                    if _auto_pid:
+                        st.info(f"🤖 تم اكتشاف رقم المنتج تلقائياً: **{_auto_pid}**")
+                        st.session_state["manual_pid_col_name"] = _auto_pid
+                    else:
+                        st.warning("⚠️ لم يُكتشف عمود رقم المنتج — حدده يدوياً أعلاه")
+                        st.session_state["manual_pid_col_name"] = None
+
+                # معاينة البيانات
+                st.caption(f"📊 {len(_prev_df)} صف × {len(_prev_df.columns)} عمود")
+                st.dataframe(_prev_df.head(5), use_container_width=True)
+
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
         bg_mode  = st.checkbox("⚡ معالجة خلفية (يمكنك التنقل أثناء التحليل)", value=True)
@@ -615,6 +669,13 @@ elif page == "📂 رفع الملفات":
             if err:
                 st.error(f"❌ {err}")
             else:
+                # ── تطبيق اختيار الأعمدة اليدوي ──────────────────
+                _mpid = st.session_state.get("manual_pid_col_name")
+                if _mpid and _mpid in our_df.columns:
+                    # نعيد تسمية العمود إلى الاسم المعياري
+                    our_df = our_df.rename(columns={_mpid: "رقم المنتج"})
+                    st.info(f"🔢 تم ربط عمود رقم المنتج: **{_mpid}**")
+
                 if max_rows > 0:
                     our_df = our_df.head(int(max_rows))
 
@@ -1085,6 +1146,34 @@ elif page == "⚠️ تحت المراجعة":
         df = st.session_state.results["review"]
         if not df.empty:
             st.warning(f"⚠️ {len(df)} منتج بتطابق غير مؤكد")
+
+            # ── تقسيم حسب مستوى الثقة ──────────────────────────
+            if "نسبة_التطابق" in df.columns:
+                _high_c = df[df["نسبة_التطابق"] >= 85]
+                _med_c  = df[(df["نسبة_التطابق"] >= 70) & (df["نسبة_التطابق"] < 85)]
+                _low_c  = df[df["نسبة_التطابق"] < 70]
+                _cc1, _cc2, _cc3 = st.columns(3)
+                _cc1.markdown(f"""<div style="background:#00C85322;border:1px solid #00C85344;
+                    border-radius:8px;padding:8px;text-align:center">
+                    <div style="color:#00C853;font-size:1.3rem;font-weight:900">{len(_high_c)}</div>
+                    <div style="color:#aaa;font-size:.75rem">🟢 ثقة عالية (85-96%)</div>
+                    <div style="color:#777;font-size:.7rem">قريب من الصواب — راجع السعر</div>
+                    </div>""", unsafe_allow_html=True)
+                _cc2.markdown(f"""<div style="background:#FFD60022;border:1px solid #FFD60044;
+                    border-radius:8px;padding:8px;text-align:center">
+                    <div style="color:#FFD600;font-size:1.3rem;font-weight:900">{len(_med_c)}</div>
+                    <div style="color:#aaa;font-size:.75rem">🟡 ثقة متوسطة (70-84%)</div>
+                    <div style="color:#777;font-size:.7rem">يحتاج تحقق AI</div>
+                    </div>""", unsafe_allow_html=True)
+                _cc3.markdown(f"""<div style="background:#FF174422;border:1px solid #FF174444;
+                    border-radius:8px;padding:8px;text-align:center">
+                    <div style="color:#FF1744;font-size:1.3rem;font-weight:900">{len(_low_c)}</div>
+                    <div style="color:#aaa;font-size:.75rem">🔴 ثقة منخفضة (&lt;70%)</div>
+                    <div style="color:#777;font-size:.7rem">مراجعة يدوية إجبارية</div>
+                    </div>""", unsafe_allow_html=True)
+                st.markdown("")
+                # ترتيب: الثقة الأعلى أولاً
+                df = df.sort_values("نسبة_التطابق", ascending=False)
             with st.expander("🤖 نصيحة AI — كيف تتعامل مع المراجعة", expanded=False):
                 if st.button("📡 تحليل قسم المراجعة", key="ai_review_section"):
                     with st.spinner("🤖 AI يراجع المطابقات المشكوك فيها..."):

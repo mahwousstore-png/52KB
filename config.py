@@ -8,7 +8,7 @@ import json as _json
 # ===== معلومات التطبيق =====
 APP_TITLE   = "نظام التسعير الذكي - مهووس"
 APP_NAME    = APP_TITLE
-APP_VERSION = "v19.0"
+APP_VERSION = "v22.0"
 APP_ICON    = "🧪"
 GEMINI_MODEL = "gemini-2.0-flash"
 
