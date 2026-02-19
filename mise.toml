@@ -1,0 +1,25 @@
+[tools]
+python = "3.11"
+
+[env]
+# متغيرات البيئة للتطوير المحلي
+# انسخ .streamlit/secrets.toml.example → .streamlit/secrets.toml
+# ثم أضف مفاتيح الـ API الخاصة بك
+PYTHONDONTWRITEBYTECODE = "1"
+PYTHONUNBUFFERED = "1"
+
+[tasks.install]
+run = "pip install -r requirements.txt"
+description = "تثبيت المتطلبات"
+
+[tasks.run]
+run = "streamlit run app.py"
+description = "تشغيل التطبيق محلياً"
+
+[tasks.railway-login]
+run = "railway login"
+description = "تسجيل دخول إلى Railway"
+
+[tasks.deploy]
+run = "railway up"
+description = "رفع التطبيق إلى Railway"
