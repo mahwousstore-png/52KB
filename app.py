@@ -684,6 +684,9 @@ elif page == "📂 رفع الملفات":
             if err:
                 st.error(f"❌ {err}")
             else:
+                # ── مسح النتائج القديمة قبل بدء تحليل جديد ───────
+                st.session_state.results = None
+                st.session_state.analysis_df = None
                 # ── تطبيق اختيار الأعمدة اليدوي ──────────────────
                 _mpid = st.session_state.get("manual_pid_col_name")
                 if _mpid and _mpid in our_df.columns:
@@ -736,8 +739,8 @@ elif page == "📂 رفع الملفات":
                                     break
 
                         job = get_job_progress(job_id)
-                        if job and job["status"] == "done" and job.get("results"):
-                            df_all = pd.DataFrame(job["results"])
+                        if job and job["status"] == "done":
+                            df_all = pd.DataFrame(job.get("results") or [])
                             missing_df = find_missing_products(our_df, comp_dfs)
                             st.session_state.results = {
                                 "price_raise": df_all[df_all["القرار"].str.contains("أعلى",na=False)].reset_index(drop=True),

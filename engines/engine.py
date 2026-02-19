@@ -945,6 +945,7 @@ def find_missing_products(our_df, comp_dfs):
         ])
 
         for _, row in cdf.iterrows():
+          try:
             cp_raw = str(row.get(ccol, "")).strip()
             if not cp_raw or is_sample(cp_raw): continue
             cp_norm = normalize(cp_raw)
@@ -977,31 +978,34 @@ def find_missing_products(our_df, comp_dfs):
                 )
                 found = False
                 for match_str, match_score, match_idx in matches:
-                    our_item = candidates[match_idx]
+                    try:
+                        our_item = candidates[match_idx]
+                    except IndexError:
+                        continue
                     penalty = 0
 
                     # عقوبة فرق الحجم
                     if cp_size and our_item["size"]:
                         sz_diff = abs(cp_size - our_item["size"])
-                        if sz_diff > 30:    penalty += 30
+                        if sz_diff > 30:    penalty += 35
                         elif sz_diff > 10:  penalty += 20
 
-                    # عقوبة اختلاف النوع (EDP vs EDT)
+                    # عقوبة اختلاف النوع (EDP vs EDT) — مرتفعة لأن EDP≠EDT منتج مختلف
                     if cp_type and our_item["type"] and cp_type != our_item["type"]:
-                        penalty += 15
+                        penalty += 30
 
                     # عقوبة اختلاف الجنس
                     if cp_gender and our_item["gender"] and cp_gender != our_item["gender"]:
-                        penalty += 25
+                        penalty += 30
 
-                    # عقوبة اختلاف خط الإنتاج
+                    # عقوبة اختلاف خط الإنتاج (متدرجة)
                     if cp_pline and our_item["pline"]:
                         pline_score = fuzz.token_sort_ratio(cp_pline, our_item["pline"])
-                        if pline_score < 75:
-                            penalty += 20
+                        if pline_score < 55:    penalty += 35
+                        elif pline_score < 75:  penalty += 20
 
                     effective_score = match_score - penalty
-                    if effective_score >= 68:
+                    if effective_score >= 70:
                         found = True
                         break
 
@@ -1019,6 +1023,8 @@ def find_missing_products(our_df, comp_dfs):
                     "الجنس": cp_gender,
                     "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
                 })
+          except Exception:
+              continue
 
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 
