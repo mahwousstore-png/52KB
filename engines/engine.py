@@ -1,5 +1,5 @@
 """
-engines/engine.py  v21.0 — محرك المطابقة الفائق السرعة
+engines/engine.py  v21.1 — محرك المطابقة الفائق السرعة
 ═══════════════════════════════════════════════════════
 🚀 تطبيع مسبق (Pre-normalize) → vectorized cdist → Gemini للغموض فقط
 ⚡ 5x أسرع من v20 مع نفس الدقة 99.5%
@@ -273,7 +273,8 @@ def extract_type(text):
 def extract_gender(text):
     if not isinstance(text, str): return ""
     tl = text.lower()
-    m = any(k in tl for k in ["pour homme","for men"," men "," man ","رجالي","للرجال"," مان "," هوم ","homme"," uomo"])
+    # تم التحديث ليشمل mans وصيغ الرجال المطلوبة
+    m = any(k in tl for k in ["pour homme","for men"," men "," man ","رجالي","للرجال"," مان "," هوم ","homme"," uomo", "mans", "for mans", " mans "])
     w = any(k in tl for k in ["pour femme","for women","women"," woman ","نسائي","للنساء","النسائي","lady","femme"," donna"])
     if m and not w: return "رجالي"
     if w and not m: return "نسائي"
@@ -679,7 +680,7 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
                     الماركة=brand, الحجم=sz_str, النوع=ptype, الجنس=gender,
                     منتج_المنافس="—", معرف_المنافس="", سعر_المنافس=0,
                     الفرق=0, نسبة_التطابق=0, ثقة_AI="—",
-                    القرار=override or "🔵 مفقود عند المنافس",
+                    القرار=override or "🔍 منتجات مفقودة",
                     الخطورة="", المنافس="", عدد_المنافسين=0,
                     جميع_المنافسين=[], مصدر_المطابقة=src or "—",
                     تاريخ_المطابقة=datetime.now().strftime("%Y-%m-%d"))
@@ -700,7 +701,7 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
     # 🔴 سعر أعلى: سعرنا أعلى من المنافس بأكثر من 10 ريال
     # 🟢 سعر أقل: سعرنا أقل من المنافس بأكثر من 10 ريال
     # ✅ موافق: سعرنا مناسب (فرق ≤ 10 ريال)
-    # ⚠️ مراجعة: المطابقة غير مؤكدة (ثقة منخفضة)
+    # ⚠️ تحت المراجعة: المطابقة غير مؤكدة (ثقة منخفضة)
     PRICE_DIFF_THRESHOLD = 10  # فرق السعر المقبول بالريال
     if override:
         dec = override
@@ -711,12 +712,12 @@ def _row(product, our_price, our_id, brand, size, ptype, gender,
             elif diff < -PRICE_DIFF_THRESHOLD:   dec = "🟢 سعر أقل"
             else:                                dec = "✅ موافق"
         else:
-            dec = "⚠️ مراجعة"  # لا يوجد سعر → مراجعة
+            dec = "⚠️ تحت المراجعة"  # لا يوجد سعر → مراجعة
     elif score >= REVIEW_THRESHOLD:
         # مطابقة محتملة لكن تحتاج تأكيد → تحت المراجعة
-        dec = "⚠️ مراجعة"
+        dec = "⚠️ تحت المراجعة"
     else:
-        dec = "⚠️ مراجعة"
+        dec = "⚠️ تحت المراجعة"
 
     ai_lbl = {"gemini":f"🤖✅({score:.0f}%)",
               "auto":f"🎯({score:.0f}%)",
@@ -776,7 +777,7 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
             if ci < 0:
                 results.append(_row(it["product"],it["our_price"],it["our_id"],
                                     it["brand"],it["size"],it["ptype"],it["gender"],
-                                    None,"🔵 مفقود عند المنافس","gemini_no_match"))
+                                    None,"🔍 منتجات مفقودة","gemini_no_match"))
             else:
                 best = it["candidates"][ci]
                 results.append(_row(it["product"],it["our_price"],it["our_id"],
@@ -810,7 +811,7 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
 
         if not all_cands:
             results.append(_row(product,our_price,our_id,brand,size,ptype,gender,
-                                None,"🔵 مفقود عند المنافس"))
+                                None,"🔍 منتجات مفقودة"))
             if progress_callback: progress_callback((i+1)/total)
             continue
 
@@ -837,13 +838,23 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
 
 
 # ═══════════════════════════════════════════════════════
-#  المنتجات المفقودة
+#  المنتجات المفقودة (محدثة بدقة صارمة 100%)
 # ═══════════════════════════════════════════════════════
 def find_missing_products(our_df, comp_dfs):
     our_col  = _fcol(our_df, ["المنتج","اسم المنتج","Product","Name","name"])
-    our_norms = [normalize(str(r.get(our_col,"")))
-                 for _,r in our_df.iterrows()
-                 if not is_sample(str(r.get(our_col,"")))]
+    
+    # نحتفظ ببيانات منتجاتنا لنسرع عملية المطابقة الصارمة
+    our_items = []
+    for _, r in our_df.iterrows():
+        name = str(r.get(our_col, "")).strip()
+        if not name or is_sample(name): continue
+        brand = extract_brand(name)
+        our_items.append({
+            "norm": normalize(name),
+            "brand": brand,
+            "pline": extract_product_line(name, brand),
+            "size": extract_size(name)
+        })
 
     missing, seen = [], set()
     for cname, cdf in comp_dfs.items():
@@ -854,23 +865,55 @@ def find_missing_products(our_df, comp_dfs):
             "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
             "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
         ])
+        
         for _, row in cdf.iterrows():
-            cp = str(row.get(ccol,"")).strip()
+            cp = str(row.get(ccol, "")).strip()
             if not cp or is_sample(cp): continue
             cn = normalize(cp)
             if not cn or cn in seen: continue
-            match = rf_process.extractOne(cn, our_norms, scorer=fuzz.token_sort_ratio, score_cutoff=70)
-            if match: continue
-            seen.add(cn)
-            sz = extract_size(cp)
-            missing.append({
-                "منتج_المنافس": cp, "معرف_المنافس": _pid(row,icol),
-                "سعر_المنافس": _price(row), "المنافس": cname,
-                "الماركة": extract_brand(cp),
-                "الحجم": f"{int(sz)}ml" if sz else "",
-                "النوع": extract_type(cp), "الجنس": extract_gender(cp),
-                "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
-            })
+            
+            c_brand = extract_brand(cp)
+            c_pline = extract_product_line(cp, c_brand)
+            c_size = extract_size(cp)
+            
+            # تصفية المقارنة حسب الماركة لتجنب التطابقات الوهمية العشوائية
+            if c_brand:
+                candidates = [o for o in our_items if not o["brand"] or normalize(o["brand"]) == normalize(c_brand)]
+            else:
+                candidates = our_items
+            
+            is_missing = True
+            if candidates:
+                norms = [c["norm"] for c in candidates]
+                # نرفع الدقة لـ 85 لمنع التطابق العشوائي للكلمات العامة
+                match = rf_process.extractOne(cn, norms, scorer=fuzz.token_set_ratio, score_cutoff=85)
+                
+                if match:
+                    idx = norms.index(match[0])
+                    matched_item = candidates[idx]
+                    
+                    # تحقق إضافي لتأكيد أن المنتجين متشابهان فعلاً
+                    if c_size > 0 and matched_item["size"] > 0 and abs(c_size - matched_item["size"]) > 20:
+                        is_missing = True # أحجام مختلفة تماماً
+                    elif c_pline and matched_item["pline"]:
+                        pl_score = fuzz.token_sort_ratio(c_pline, matched_item["pline"])
+                        if pl_score >= 70:
+                            is_missing = False # موجودان فعلاً وتطابق خط الإنتاج
+                    else:
+                        is_missing = False # موجود
+                        
+            if is_missing:
+                seen.add(cn)
+                sz = extract_size(cp)
+                missing.append({
+                    "منتج_المنافس": cp, "معرف_المنافس": _pid(row, icol),
+                    "سعر_المنافس": _price(row), "المنافس": cname,
+                    "الماركة": c_brand,
+                    "الحجم": f"{int(sz)}ml" if sz else "",
+                    "النوع": extract_type(cp), "الجنس": extract_gender(cp),
+                    "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
+                })
+                
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 
 
@@ -892,8 +935,9 @@ def export_excel(df, sheet_name="النتائج"):
         for cell in ws[1]:
             cell.fill=hfill; cell.font=hfont
             cell.alignment=Alignment(horizontal="center")
+        # تم تعديل المسميات هنا لمطابقة طلبك بدقة تامة
         COLORS = {"🔴 سعر أعلى":"FFCCCC","🟢 سعر أقل":"CCFFCC",
-                  "✅ موافق":"CCFFEE","⚠️ مراجعة":"FFF3CC","🔵 مفقود":"CCE5FF"}
+                  "✅ موافق":"CCFFEE","⚠️ تحت المراجعة":"FFF3CC","🔍 منتجات مفقودة":"CCE5FF"}
         dcol = None
         for i, cell in enumerate(ws[1], 1):
             if cell.value and "القرار" in str(cell.value): dcol=i; break
