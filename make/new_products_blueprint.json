@@ -1,0 +1,393 @@
+{
+    "name": "Mahwous - إضافة منتجات جديدة لسلة",
+    "flow": [
+        {
+            "id": 1,
+            "module": "gateway:CustomWebHook",
+            "version": 1,
+            "parameters": {
+                "hook": 3871450,
+                "maxResults": 1
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "hook": {
+                            "data": {
+                                "editable": "true"
+                            },
+                            "label": "update-prices-webhook"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "hook",
+                        "type": "hook:gateway-webhook",
+                        "label": "Webhook",
+                        "required": true
+                    },
+                    {
+                        "name": "maxResults",
+                        "type": "number",
+                        "label": "Maximum number of results"
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "products",
+                        "spec": {
+                            "spec": [
+                                {
+                                    "name": "product_id",
+                                    "type": "text"
+                                },
+                                {
+                                    "name": "name",
+                                    "type": "text"
+                                },
+                                {
+                                    "name": "price",
+                                    "type": "number"
+                                },
+                                {
+                                    "name": "sku",
+                                    "type": "text"
+                                },
+                                {
+                                    "name": "weight",
+                                    "type": "number"
+                                },
+                                {
+                                    "name": "cost_price",
+                                    "type": "number"
+                                },
+                                {
+                                    "name": "sale_price",
+                                    "type": "number"
+                                },
+                                {
+                                    "name": "description",
+                                    "type": "text"
+                                },
+                                {
+                                    "name": "brand",
+                                    "type": "text"
+                                },
+                                {
+                                    "name": "section",
+                                    "type": "text"
+                                }
+                            ],
+                            "type": "collection"
+                        },
+                        "type": "array"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "builtin:BasicFeeder",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "array": "{{1.products}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 0
+                },
+                "restore": {
+                    "expect": {
+                        "array": {
+                            "mode": "edit",
+                            "items": [
+                                null
+                            ]
+                        }
+                    }
+                },
+                "expect": [
+                    {
+                        "mode": "edit",
+                        "name": "array",
+                        "spec": [],
+                        "type": "array",
+                        "label": "Array"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 3,
+            "module": "salla:CreateProduct",
+            "version": 1,
+            "parameters": {
+                "__IMTCONN__": 13636204
+            },
+            "mapper": {
+                "sku": "{{2.sku}}",
+                "name": "{{2.name}}",
+                "price": "{{2.price}}",
+                "weight": "{{2.weight}}",
+                "quantity": 100,
+                "categories": [
+                    172281807,
+                    191427253,
+                    550953826,
+                    1670643160,
+                    1319068713,
+                    1409506432,
+                    1893373528,
+                    922334955,
+                    2101106777,
+                    1085890625,
+                    1994146112,
+                    2035147845,
+                    1570481787,
+                    62818170,
+                    835745913,
+                    170801791
+                ],
+                "cost_price": "{{2.cost_price}}",
+                "sale_price": "{{2.sale_price}}",
+                "description": "{{2.description}}",
+                "product_type": "product",
+                "require_shipping": true,
+                "maximum_quantity_per_order": 1
+            },
+            "metadata": {
+                "designer": {
+                    "x": 600,
+                    "y": 0
+                },
+                "restore": {
+                    "expect": {
+                        "pinned": {
+                            "mode": "chose"
+                        },
+                        "status": {
+                            "mode": "chose"
+                        },
+                        "brand_id": {
+                            "mode": "chose",
+                            "label": "Empty"
+                        },
+                        "categories": {
+                            "mode": "chose",
+                            "label": [
+                                "عطور النيش",
+                                "مبخرة اكتروني",
+                                "تستر عطر جيرلان أبسولو أليجوريا فلورابلوم أ",
+                                "جيرلان",
+                                "العطور",
+                                "الجمال و العناية",
+                                "تغليف هدايا",
+                                "عروض مهووس",
+                                "العطور الأكثر مبيعاً",
+                                "للشعر والجسم",
+                                "مجموعات وأطقم هدايا",
+                                "عطور عينات ميني",
+                                "معطرات المنازل",
+                                "إكسسوارات العطور",
+                                "العود و البخور",
+                                "جديد مهووس"
+                            ]
+                        },
+                        "enable_note": {
+                            "mode": "chose"
+                        },
+                        "product_type": {
+                            "mode": "chose",
+                            "label": "product"
+                        },
+                        "hide_quantity": {
+                            "mode": "chose"
+                        },
+                        "require_shipping": {
+                            "mode": "chose"
+                        },
+                        "enable_upload_image": {
+                            "mode": "chose"
+                        }
+                    },
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "data": {
+                                "scoped": "true",
+                                "connection": "salla2"
+                            },
+                            "label": "mahwous_pricing_template"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:salla2,salla",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "name",
+                        "type": "text",
+                        "label": "The name of the product.",
+                        "required": true
+                    },
+                    {
+                        "name": "price",
+                        "type": "uinteger",
+                        "label": "The price of the product.",
+                        "required": true
+                    },
+                    {
+                        "name": "product_type",
+                        "type": "select",
+                        "label": "The type of product.",
+                        "required": true
+                    },
+                    {
+                        "name": "quantity",
+                        "type": "uinteger",
+                        "label": "The amount of the product.",
+                        "required": true
+                    },
+                    {
+                        "name": "description",
+                        "type": "text",
+                        "label": "The description of the product."
+                    },
+                    {
+                        "name": "min_amount_donating",
+                        "type": "uinteger",
+                        "label": "The minimum amount to donate."
+                    },
+                    {
+                        "name": "max_amount_donating",
+                        "type": "uinteger",
+                        "label": "The mix amount to donate."
+                    },
+                    {
+                        "name": "sale_price",
+                        "type": "uinteger",
+                        "label": "The sale price of the product."
+                    },
+                    {
+                        "name": "cost_price",
+                        "type": "uinteger",
+                        "label": "The cost of the price of the product."
+                    },
+                    {
+                        "name": "sale_end",
+                        "type": "date",
+                        "label": "The ended date sale of the product."
+                    },
+                    {
+                        "name": "require_shipping",
+                        "type": "boolean",
+                        "label": "if the product requires shipping or not."
+                    },
+                    {
+                        "name": "maximum_quantity_per_order",
+                        "type": "uinteger",
+                        "label": "Maximum Quantity Per Order"
+                    },
+                    {
+                        "name": "weight",
+                        "type": "uinteger",
+                        "label": "Applicable to the weight of the product."
+                    },
+                    {
+                        "name": "sku",
+                        "type": "text",
+                        "label": "The SKU of the product."
+                    },
+                    {
+                        "name": "hide_quantity",
+                        "type": "boolean",
+                        "label": "Whether to hide the quantity or not."
+                    },
+                    {
+                        "name": "enable_upload_image",
+                        "type": "boolean",
+                        "label": "Enable upload image for the product."
+                    },
+                    {
+                        "name": "enable_note",
+                        "type": "boolean",
+                        "label": "Allow to customer write notes"
+                    },
+                    {
+                        "name": "pinned",
+                        "type": "boolean",
+                        "label": "if you want to pin the product."
+                    },
+                    {
+                        "name": "subtitle",
+                        "type": "text",
+                        "label": "The subtitle of the product."
+                    },
+                    {
+                        "name": "promotion_title",
+                        "type": "text",
+                        "label": "The promotion title "
+                    },
+                    {
+                        "name": "metadata_title",
+                        "type": "text",
+                        "label": "The Seo title for product page."
+                    },
+                    {
+                        "name": "metadata_description",
+                        "type": "text",
+                        "label": "The Seo description for product page."
+                    },
+                    {
+                        "name": "categories",
+                        "type": "select",
+                        "label": "Select Categories",
+                        "multiple": true
+                    },
+                    {
+                        "name": "brand_id",
+                        "type": "select",
+                        "label": "Select Brand"
+                    },
+                    {
+                        "name": "status",
+                        "type": "select",
+                        "label": "The status of the product."
+                    }
+                ]
+            }
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "eu2.make.com",
+        "notes": []
+    }
+}
