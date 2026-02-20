@@ -409,7 +409,21 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
 
         with b6:  # تصدير Make
             if st.button("📤 Make", key=f"mk_{prefix}_{idx}"):
-                _pid = str(row.get("معرف_المنتج", row.get("product_id", "")))
+                # سحب رقم المنتج من جميع الأعمدة المحتملة
+                _pid_raw = (
+                    row.get("معرف_المنتج", "") or
+                    row.get("product_id", "") or
+                    row.get("رقم المنتج", "") or
+                    row.get("رقم_المنتج", "") or
+                    row.get("معرف المنتج", "") or ""
+                )
+                # تحويل float إلى int (مثل 1081786650.0 → 1081786650)
+                try:
+                    _fv = float(_pid_raw)
+                    _pid = str(int(_fv)) if _fv == int(_fv) else str(_pid_raw)
+                except (ValueError, TypeError):
+                    _pid = str(_pid_raw).strip()
+                if _pid in ("nan", "None", "NaN", ""): _pid = ""
                 _new_price = round(comp_price - 1, 2) if comp_price > 0 else our_price
                 res = send_single_product({
                     "product_id": _pid,

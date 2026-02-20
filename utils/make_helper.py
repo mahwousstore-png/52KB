@@ -77,16 +77,23 @@ def export_to_make_format(df, section_type: str = "update") -> List[Dict]:
 
     for _, row in df.iterrows():
         # ── رقم المنتج ──────────────────────────────────────────────────
-        # نبحث في عدة أعمدة محتملة
-        product_id = (
-            str(row.get("معرف_المنتج", ""))
-            or str(row.get("product_id", ""))
-            or str(row.get("رقم_المنتج", ""))
-            or str(row.get("sku", ""))
-            or str(row.get("SKU", ""))
-            or ""
+        # نبحث في جميع الأعمدة المحتملة لرقم المنتج
+        _pid_raw = (
+            row.get("معرف_المنتج", "") or
+            row.get("product_id", "") or
+            row.get("رقم المنتج", "") or
+            row.get("رقم_المنتج", "") or
+            row.get("معرف المنتج", "") or
+            row.get("sku", "") or
+            row.get("SKU", "") or ""
         )
-        product_id = product_id.strip() if product_id not in ("", "nan", "None") else ""
+        # تحويل float إلى int لإزالة .0 (مثل 1081786650.0 → 1081786650)
+        try:
+            _fv = float(_pid_raw)
+            product_id = str(int(_fv)) if _fv == int(_fv) else str(_pid_raw).strip()
+        except (ValueError, TypeError):
+            product_id = str(_pid_raw).strip()
+        if product_id in ("", "nan", "None", "NaN"): product_id = ""
 
         # ── اسم المنتج ──────────────────────────────────────────────────
         name = (

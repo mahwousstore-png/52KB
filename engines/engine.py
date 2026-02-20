@@ -431,8 +431,16 @@ def _price(row):
 
 def _pid(row, col):
     if not col or col not in row.index: return ""
-    v = str(row.get(col,""))
-    return v if v not in ("nan","None","") else ""
+    v = row.get(col, "")
+    if v is None or str(v) in ("nan", "None", "", "NaN"): return ""
+    # تحويل float إلى int لإزالة .0 (مثل 1081786650.0 → 1081786650)
+    try:
+        fv = float(v)
+        if fv == int(fv):
+            return str(int(fv))
+    except (ValueError, TypeError):
+        pass
+    return str(v).strip()
 
 def _fcol(df, cands):
     for c in cands:
