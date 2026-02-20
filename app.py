@@ -52,6 +52,7 @@ _defaults = {
     "results": None, "missing_df": None, "analysis_df": None,
     "chat_history": [], "job_id": None, "job_running": False,
     "decisions_pending": {},   # {product_name: action}
+    "our_df": None, "comp_dfs": None,  # حفظ الملفات للمنتجات المفقودة
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
@@ -655,6 +656,9 @@ elif page == "📂 رفع الملفات":
                     else: comp_dfs[cf.name] = cdf
 
                 if comp_dfs:
+                    # حفظ البيانات في session_state لاستخدامها لاحقاً في find_missing_products
+                    st.session_state.our_df = our_df
+                    st.session_state.comp_dfs = comp_dfs
                     job_id = str(uuid.uuid4())[:8]
                     st.session_state.job_id = job_id
                     comp_names = ",".join(comp_dfs.keys())
@@ -692,7 +696,10 @@ elif page == "📂 رفع الملفات":
                         job = get_job_progress(job_id)
                         if job and job["status"] == "done" and job.get("results"):
                             df_all = pd.DataFrame(job["results"])
-                            missing_df = find_missing_products(our_df, comp_dfs)
+                            # استخدام session_state لضمان بقاء البيانات بعد إعادة تشغيل Streamlit
+                            _our_df = st.session_state.get("our_df", our_df)
+                            _comp_dfs = st.session_state.get("comp_dfs", comp_dfs)
+                            missing_df = find_missing_products(_our_df, _comp_dfs) if _our_df is not None and _comp_dfs else pd.DataFrame()
                             st.session_state.results = {
                                 "price_raise": df_all[df_all["القرار"].str.contains("أعلى",na=False)].reset_index(drop=True),
                                 "price_lower": df_all[df_all["القرار"].str.contains("أقل", na=False)].reset_index(drop=True),
