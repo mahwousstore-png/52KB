@@ -259,7 +259,8 @@ def send_price_updates(products: List[Dict]) -> Dict:
 def send_new_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة منتجات جديدة إلى Make لإضافتها في سلة.
-    يُرسل كل منتج في طلب منفصل (flat) بدون Iterator لتجنب مشاكل الـ mapping.
+    يُرسل كل منتج في طلب منفصل (flat) مباشرة بدون مصفوفة.
+    Blueprint يقرأ {{1.name}}, {{1.price}} مباشرة من الـ Webhook.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات للإرسال"}
@@ -277,7 +278,6 @@ def send_new_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        # إرسال كل منتج مباشرة بدون مصفوفة
         payload = {
             "name": name,
             "price": price,
@@ -294,19 +294,20 @@ def send_new_products(products: List[Dict]) -> Dict:
         if result["success"]:
             sent += 1
         else:
-            errors.append(name[:30])
-    if sent > 0:
-        skip_msg = f" (تم تخطي {skipped})" if skipped else ""
-        err_msg = f" (فشل {len(errors)})" if errors else ""
-        return {"success": True, "message": f"✅ تم إرسال {sent} منتج جديد إلى Make{skip_msg}{err_msg}"}
-    return {"success": False, "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped})"}
+            errors.append(name)
+    if sent == 0:
+        return {"success": False, "message": f"❌ فشل إرسال جميع المنتجات. تم تخطي {skipped}"}
+    skip_msg = f" (تم تخطي {skipped})" if skipped else ""
+    err_msg  = f" (فشل {len(errors)})" if errors else ""
+    return {"success": True, "message": f"✅ تم إرسال {sent} منتج جديد إلى Make{skip_msg}{err_msg}"}
 
 
 # ── إرسال المنتجات المفقودة ─────────────────────────────────────────────
 def send_missing_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة المنتجات المفقودة إلى Make.
-    يُرسل كل منتج في طلب منفصل (flat) بدون Iterator.
+    يُرسل كل منتج في طلب منفصل (flat) مباشرة بدون مصفوفة.
+    Blueprint يقرأ {{1.name}}, {{1.price}} مباشرة من الـ Webhook.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات مفقودة للإرسال"}
@@ -320,7 +321,6 @@ def send_missing_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        # إرسال كل منتج مباشرة بدون مصفوفة
         payload = {
             "name": name,
             "price": price,
@@ -337,12 +337,12 @@ def send_missing_products(products: List[Dict]) -> Dict:
         if result["success"]:
             sent += 1
         else:
-            errors.append(name[:30])
-    if sent > 0:
-        skip_msg = f" (تم تخطي {skipped})" if skipped else ""
-        err_msg = f" (فشل {len(errors)})" if errors else ""
-        return {"success": True, "message": f"✅ تم إرسال {sent} منتج مفقود إلى Make{skip_msg}{err_msg}"}
-    return {"success": False, "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped})"}
+            errors.append(name)
+    if sent == 0:
+        return {"success": False, "message": f"❌ فشل إرسال جميع المنتجات. تم تخطي {skipped}"}
+    skip_msg = f" (تم تخطي {skipped})" if skipped else ""
+    err_msg  = f" (فشل {len(errors)})" if errors else ""
+    return {"success": True, "message": f"✅ تم إرسال {sent} منتج مفقود إلى Make{skip_msg}{err_msg}"}
 
 
 # ── فحص حالة الاتصال بـ Webhooks ─────────────────────────────────────────
