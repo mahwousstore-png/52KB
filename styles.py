@@ -63,11 +63,13 @@ def stat_card(icon, label, value, color="#6C63FF"):
     return f'<div class="stat-card" style="border-top:3px solid {color}"><div style="font-size:1.3rem">{icon}</div><div class="num" style="color:{color}">{value}</div><div class="lbl">{label}</div></div>'
 
 
-def vs_card(our_name, our_price, comp_name, comp_price, diff, comp_source=""):
+def vs_card(our_name, our_price, comp_name, comp_price, diff, comp_source="", product_id=""):
     dc = "#FF1744" if diff > 0 else "#00C853" if diff < 0 else "#FFD600"
     src = f'<div style="font-size:.65rem;color:#666">{comp_source}</div>' if comp_source else ""
+    pid = str(product_id) if product_id and str(product_id) not in ("", "nan", "None", "0") else ""
+    pid_html = f'<div style="font-size:.65rem;color:#6C63FF99;margin-top:1px">🔢 #{pid}</div>' if pid else ""
     return f'''<div class="vs-row">
-<div class="our-s"><div style="font-size:.7rem;color:#8B8B8B">منتجنا</div><div style="font-weight:700;color:#B8B4FF;font-size:.9rem">{our_name}</div><div style="font-size:1.1rem;font-weight:900;color:#6C63FF;margin-top:2px">{our_price:.0f} ر.س</div></div>
+<div class="our-s"><div style="font-size:.7rem;color:#8B8B8B">منتجنا</div><div style="font-weight:700;color:#B8B4FF;font-size:.9rem">{our_name}</div>{pid_html}<div style="font-size:1.1rem;font-weight:900;color:#6C63FF;margin-top:2px">{our_price:.0f} ر.س</div></div>
 <div class="vs-badge">VS</div>
 <div class="comp-s"><div style="font-size:.7rem;color:#8B8B8B">المنافس</div><div style="font-weight:700;color:#FFD180;font-size:.9rem">{comp_name}</div><div style="font-size:1.1rem;font-weight:900;color:#ff9800;margin-top:2px">{comp_price:.0f} ر.س</div>{src}</div>
 </div><div style="text-align:center;margin:2px 0"><span style="color:{dc};font-weight:700;font-size:.9rem">الفرق: {diff:+.0f} ر.س</span></div>'''

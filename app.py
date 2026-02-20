@@ -257,9 +257,22 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         decision   = str(row.get("القرار", ""))
         ts_now     = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        # بطاقة VS
+        # سحب رقم المنتج من جميع الأعمدة المحتملة
+        _pid_raw = (
+            row.get("معرف_المنتج", "") or
+            row.get("product_id", "") or
+            row.get("رقم المنتج", "") or
+            row.get("رقم_المنتج", "") or
+            row.get("معرف المنتج", "") or ""
+        )
+        _pid_str = ""
+        if _pid_raw and str(_pid_raw) not in ("", "nan", "None", "0"):
+            try: _pid_str = str(int(float(str(_pid_raw))))
+            except: _pid_str = str(_pid_raw)
+
+        # بطاقة VS مع رقم المنتج
         st.markdown(vs_card(our_name, our_price, comp_name,
-                            comp_price, diff, comp_src),
+                            comp_price, diff, comp_src, _pid_str),
                     unsafe_allow_html=True)
 
         # شريط المعلومات
