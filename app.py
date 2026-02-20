@@ -764,7 +764,7 @@ elif page == "🔴 سعر أعلى":
                                    f"3. استراتيجية تسعير مخصصة لكل ماركة")
                         r = call_ai(_prompt, "price_raise")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
-            render_pro_table(df, "raise", "update")
+            render_pro_table(df, "raise", "raise")
         else:
             st.success("✅ ممتاز! لا توجد منتجات بسعر أعلى")
     else:
@@ -797,7 +797,7 @@ elif page == "🟢 سعر أقل":
                                    f"3. كم الربح المتوقع إذا رفعنا الأسعار؟")
                         r = call_ai(_prompt, "price_lower")
                         st.markdown(f'<div class="ai-box">{r["response"]}</div>', unsafe_allow_html=True)
-            render_pro_table(df, "lower", "update")
+            render_pro_table(df, "lower", "lower")
         else:
             st.info("لا توجد منتجات")
     else:
@@ -814,7 +814,7 @@ elif page == "✅ موافق عليها":
         df = st.session_state.results["approved"]
         if not df.empty:
             st.success(f"✅ {len(df)} منتج بأسعار تنافسية مناسبة")
-            render_pro_table(df, "approved", "update")
+            render_pro_table(df, "approved", "approved")
         else:
             st.info("لا توجد منتجات موافق عليها")
     else:

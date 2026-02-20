@@ -95,33 +95,39 @@ def export_to_make_format(df, section_type: str = "update") -> List[Dict]:
             product_id = str(_pid_raw).strip()
         if product_id in ("", "nan", "None", "NaN"): product_id = ""
 
-        # ── اسم المنتج ──────────────────────────────────────────────────
+        # ــ اسم المنتج ـــــــــــــــــــــــــــــــــــــــــــــــ
         name = (
             str(row.get("المنتج", ""))
+            or str(row.get("منتج_المنافس", ""))  # للمنتجات المفقودة
             or str(row.get("أسم المنتج", ""))
+            or str(row.get("اسم المنتج", ""))
             or str(row.get("name", ""))
             or ""
         )
         name = name.strip() if name not in ("", "nan", "None") else ""
 
-        # ── السعر ───────────────────────────────────────────────────────
-        if section_type == "update":
-            # عند تحديث الأسعار: نرسل السعر الجديد المقترح
-            # السعر الجديد = سعر المنافس - 1 ريال (أقل منه بريال)
-            comp_price = _safe_float(row.get("سعر_المنافس", 0))
-            our_price  = _safe_float(row.get("السعر", 0))
+                # ــ السعر ـــــــــــــــــــــــــــــــــــــــــــــــ
+        comp_price = _safe_float(row.get("سعر_المنافس", 0))
+        our_price  = _safe_float(row.get("السعر", 0) or row.get("سعر المنتج", 0) or row.get("price", 0) or 0)
+
+        if section_type == "raise":
+            # سعرنا أعلى من المنافس → نخفض سعرنا إلى سعر المنافس - 1 ريال
             if comp_price > 0:
                 price = round(comp_price - 1, 2)
             else:
                 price = our_price
+        elif section_type == "lower":
+            # سعرنا أقل من المنافس → نرفع سعرنا إلى سعر المنافس - 1 ريال (أقل منه بريال)
+            if comp_price > 0:
+                price = round(comp_price - 1, 2)
+            else:
+                price = our_price
+        elif section_type in ("approved", "update"):
+            # سعر موافق عليه → نرسل سعرنا الحالي كما هو
+            price = our_price
         else:
-            # منتجات جديدة أو مفقودة: نرسل السعر الحالي
-            price = _safe_float(
-                row.get("السعر", 0)
-                or row.get("سعر المنتج", 0)
-                or row.get("price", 0)
-                or 0
-            )
+            # منتجات جديدة أو مفقودة: نرسل سعر المنافس
+            price = comp_price if comp_price > 0 else our_price
 
         # ── تجميع بيانات المنتج ─────────────────────────────────────────
         product = {

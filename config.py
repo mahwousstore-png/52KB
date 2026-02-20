@@ -100,7 +100,7 @@ EXTRA_API_KEY      = _s("EXTRA_API_KEY")
 # ══════════════════════════════════════════════
 WEBHOOK_UPDATE_PRICES = (
     _s("WEBHOOK_UPDATE_PRICES") or
-    "https://hook.eu2.make.com/99oljy0d6r3chwg6bdfsptcf6bk8htsd"
+    "https://hook.eu2.make.com/8jia6gc7s1cpkeg6catlrvwck768sbfk"
 )
 WEBHOOK_NEW_PRODUCTS = (
     _s("WEBHOOK_NEW_PRODUCTS") or
