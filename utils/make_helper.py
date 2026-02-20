@@ -259,8 +259,8 @@ def send_price_updates(products: List[Dict]) -> Dict:
 def send_new_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة منتجات جديدة إلى Make لإضافتها في سلة.
-    يُرسل كل منتج في طلب منفصل (flat) مباشرة بدون مصفوفة.
-    Blueprint يقرأ {{1.name}}, {{1.price}} مباشرة من الـ Webhook.
+    يُرسل كل منتج في طلب منفصل كـ {"data": [{...}]}
+    Iterator في Make يقرأ data[] ويُخرج كل عنصر لـ Salla.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات للإرسال"}
@@ -278,7 +278,7 @@ def send_new_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        payload = {
+        item = {
             "name": name,
             "price": price,
             "product_id": pid,
@@ -290,6 +290,7 @@ def send_new_products(products: List[Dict]) -> Dict:
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
+        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
@@ -306,8 +307,8 @@ def send_new_products(products: List[Dict]) -> Dict:
 def send_missing_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة المنتجات المفقودة إلى Make.
-    يُرسل كل منتج في طلب منفصل (flat) مباشرة بدون مصفوفة.
-    Blueprint يقرأ {{1.name}}, {{1.price}} مباشرة من الـ Webhook.
+    يُرسل كل منتج في طلب منفصل كـ {"data": [{...}]}
+    Iterator في Make يقرأ data[] ويُخرج كل عنصر لـ Salla.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات مفقودة للإرسال"}
@@ -321,7 +322,7 @@ def send_missing_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        payload = {
+        item = {
             "name": name,
             "price": price,
             "product_id": pid,
@@ -333,6 +334,7 @@ def send_missing_products(products: List[Dict]) -> Dict:
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
+        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
