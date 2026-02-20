@@ -259,13 +259,13 @@ def send_price_updates(products: List[Dict]) -> Dict:
 def send_new_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة منتجات جديدة إلى Make لإضافتها في سلة.
-    كل منتج: product_id + name + price
+    يُرسل كل منتج في طلب منفصل (flat) بدون Iterator لتجنب مشاكل الـ mapping.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات للإرسال"}
-
-    valid_products = []
+    sent = 0
     skipped = 0
+    errors = []
     for p in products:
         name  = str(p.get("name", p.get("أسم المنتج", ""))).strip()
         price = _safe_float(
@@ -274,76 +274,75 @@ def send_new_products(products: List[Dict]) -> Dict:
             or p.get("السعر", 0)
         )
         pid   = str(p.get("product_id", p.get("معرف_المنتج", ""))).strip()
-
         if not name:
             skipped += 1
             continue
-
-        valid_products.append({
-            "product_id": pid,
+        # إرسال كل منتج مباشرة بدون مصفوفة
+        payload = {
             "name": name,
             "price": price,
+            "product_id": pid,
             "section": "new",
             "brand": str(p.get("brand", p.get("الماركة", ""))).strip(),
             "description": str(p.get("الوصف", p.get("description", ""))).strip(),
-        })
-
-    if not valid_products:
-        return {
-            "success": False,
-            "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped} منتج)"
+            "sku": str(p.get("sku", "")).strip(),
+            "weight": _safe_float(p.get("weight", 0)),
+            "cost_price": _safe_float(p.get("cost_price", 0)),
+            "sale_price": _safe_float(p.get("sale_price", 0)),
         }
-
-    payload = {"products": valid_products}
-    result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
-
-    if result["success"]:
+        result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
+        if result["success"]:
+            sent += 1
+        else:
+            errors.append(name[:30])
+    if sent > 0:
         skip_msg = f" (تم تخطي {skipped})" if skipped else ""
-        result["message"] = f"✅ تم إرسال {len(valid_products)} منتج جديد إلى Make{skip_msg}"
-    return result
+        err_msg = f" (فشل {len(errors)})" if errors else ""
+        return {"success": True, "message": f"✅ تم إرسال {sent} منتج جديد إلى Make{skip_msg}{err_msg}"}
+    return {"success": False, "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped})"}
 
 
-# ── إرسال المنتجات المفقودة ───────────────────────────────────────────────
+# ── إرسال المنتجات المفقودة ─────────────────────────────────────────────
 def send_missing_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة المنتجات المفقودة إلى Make.
+    يُرسل كل منتج في طلب منفصل (flat) بدون Iterator.
     """
     if not products:
         return {"success": False, "message": "❌ لا توجد منتجات مفقودة للإرسال"}
-
-    valid_products = []
+    sent = 0
     skipped = 0
+    errors = []
     for p in products:
         name  = str(p.get("name", p.get("المنتج", ""))).strip()
         price = _safe_float(p.get("price", p.get("السعر", 0)))
         pid   = str(p.get("product_id", p.get("معرف_المنتج", ""))).strip()
-
         if not name:
             skipped += 1
             continue
-
-        valid_products.append({
-            "product_id": pid,
+        # إرسال كل منتج مباشرة بدون مصفوفة
+        payload = {
             "name": name,
             "price": price,
+            "product_id": pid,
             "section": "missing",
             "brand": str(p.get("brand", p.get("الماركة", ""))).strip(),
             "competitor": str(p.get("competitor", p.get("المنافس", ""))).strip(),
-        })
-
-    if not valid_products:
-        return {
-            "success": False,
-            "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped} منتج)"
+            "sku": str(p.get("sku", "")).strip(),
+            "weight": _safe_float(p.get("weight", 0)),
+            "cost_price": _safe_float(p.get("cost_price", 0)),
+            "sale_price": _safe_float(p.get("sale_price", 0)),
         }
-
-    payload = {"products": valid_products}
-    result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
-
-    if result["success"]:
+        result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
+        if result["success"]:
+            sent += 1
+        else:
+            errors.append(name[:30])
+    if sent > 0:
         skip_msg = f" (تم تخطي {skipped})" if skipped else ""
-        result["message"] = f"✅ تم إرسال {len(valid_products)} منتج مفقود إلى Make{skip_msg}"
-    return result
+        err_msg = f" (فشل {len(errors)})" if errors else ""
+        return {"success": True, "message": f"✅ تم إرسال {sent} منتج مفقود إلى Make{skip_msg}{err_msg}"}
+    return {"success": False, "message": f"❌ لا توجد منتجات صالحة (تم تخطي {skipped})"}
 
 
 # ── فحص حالة الاتصال بـ Webhooks ─────────────────────────────────────────
