@@ -1,5 +1,5 @@
 """
-styles.py - التصميم v17.0 (خفيف جداً)
+styles.py - التصميم v23.0 (خفيف جداً)
 """
 
 def get_styles():
@@ -11,13 +11,13 @@ def get_main_css():
 *{font-family:'Tajawal',sans-serif!important}
 .main .block-container{max-width:1400px;padding:1rem 2rem}
 .stat-card{background:#1A1A2E;border-radius:12px;padding:16px;text-align:center;border:1px solid #333344}
-.stat-card:hover{box-shadow:0 4px 16px rgba(108,99,255,.15);border-color:#6C63FF}
+.stat-card:hover{border-color:#6C63FF}
 .stat-card .num{font-size:2.2rem;font-weight:900;margin:4px 0}
 .stat-card .lbl{font-size:.85rem;color:#8B8B8B}
 .cmp-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:8px;overflow:hidden;font-size:.88rem}
 .cmp-table thead th{background:#16213e;color:#fff;padding:10px 8px;font-weight:700;text-align:center;border-bottom:2px solid #6C63FF;position:sticky;top:0;z-index:10}
 .cmp-table tbody tr:nth-child(even){background:rgba(26,26,46,.4)}
-.cmp-table tbody tr:hover{background:rgba(108,99,255,.1)!important}
+.cmp-table tbody tr:hover{background:rgba(108,99,255,.08)}
 .cmp-table td{padding:8px 6px;text-align:center;border-bottom:1px solid rgba(51,51,68,.4);vertical-align:middle}
 .td-our{background:rgba(108,99,255,.06)!important;border-right:3px solid #6C63FF;text-align:right!important;font-weight:600;color:#B8B4FF;max-width:250px;word-wrap:break-word}
 .td-comp{background:rgba(255,152,0,.06)!important;border-left:3px solid #ff9800;text-align:right!important;font-weight:600;color:#FFD180;max-width:250px;word-wrap:break-word}
@@ -39,19 +39,18 @@ def get_main_css():
 .ai-box{background:#1A1A2E;padding:12px;border-radius:8px;border:1px solid #333344;margin:6px 0}
 .paste-area{background:#0E1117;border:2px dashed #333344;border-radius:8px;padding:12px;min-height:80px}
 .multi-comp{background:rgba(0,123,255,.06);border:1px solid rgba(0,123,255,.2);border-radius:6px;padding:8px;margin:4px 0}
+.pid-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,158,255,.12);border:1px solid rgba(74,158,255,.35);border-radius:5px;padding:1px 7px;font-size:.72rem;font-weight:700;color:#4a9eff;font-family:'Tajawal',monospace;letter-spacing:.3px;vertical-align:middle}
+.pid-badge .pid-lbl{color:#5a7a9a;font-size:.65rem;font-weight:400;margin-left:3px}
 section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0E1117,#1A1A2E)}
 #MainMenu,footer,header{visibility:hidden}
-/* إصلاح مشكلة arr✓✓ight - إخفاء أيقونات Streamlit المكسورة */
+/* إصلاح أيقونات Streamlit */
 [data-testid="stExpander"] summary svg,
 [data-testid="stSelectbox"] svg[data-testid="stExpanderToggleIcon"],
 details summary span[data-testid] svg {
     font-family: system-ui, -apple-system, sans-serif !important;
 }
-/* تحسين عرض Expander و Selectbox مع النصوص العربية */
-[data-testid="stExpander"] summary {
-    direction: rtl;
-    font-family: 'Tajawal', sans-serif !important;
-}
+/* RTL + خط عربي */
+[data-testid="stExpander"] summary,
 .stSelectbox label, .stMultiSelect label {
     direction: rtl;
     font-family: 'Tajawal', sans-serif !important;
@@ -63,11 +62,19 @@ def stat_card(icon, label, value, color="#6C63FF"):
     return f'<div class="stat-card" style="border-top:3px solid {color}"><div style="font-size:1.3rem">{icon}</div><div class="num" style="color:{color}">{value}</div><div class="lbl">{label}</div></div>'
 
 
-def vs_card(our_name, our_price, comp_name, comp_price, diff, comp_source=""):
+def pid_badge(pid):
+    """شارة رقم المنتج الاحترافية"""
+    if not pid:
+        return ""
+    return f'<span class="pid-badge"><span class="pid-lbl">NO</span>{pid}</span>'
+
+
+def vs_card(our_name, our_price, comp_name, comp_price, diff, comp_source="", our_pid=""):
     dc = "#FF1744" if diff > 0 else "#00C853" if diff < 0 else "#FFD600"
     src = f'<div style="font-size:.65rem;color:#666">{comp_source}</div>' if comp_source else ""
+    _pid_html = f'<div style="margin-top:4px">{pid_badge(our_pid)}</div>' if our_pid else ""
     return f'''<div class="vs-row">
-<div class="our-s"><div style="font-size:.7rem;color:#8B8B8B">منتجنا</div><div style="font-weight:700;color:#B8B4FF;font-size:.9rem">{our_name}</div><div style="font-size:1.1rem;font-weight:900;color:#6C63FF;margin-top:2px">{our_price:.0f} ر.س</div></div>
+<div class="our-s"><div style="font-size:.7rem;color:#8B8B8B">منتجنا</div><div style="font-weight:700;color:#B8B4FF;font-size:.9rem">{our_name}</div><div style="font-size:1.1rem;font-weight:900;color:#6C63FF;margin-top:2px">{our_price:.0f} ر.س</div>{_pid_html}</div>
 <div class="vs-badge">VS</div>
 <div class="comp-s"><div style="font-size:.7rem;color:#8B8B8B">المنافس</div><div style="font-weight:700;color:#FFD180;font-size:.9rem">{comp_name}</div><div style="font-size:1.1rem;font-weight:900;color:#ff9800;margin-top:2px">{comp_price:.0f} ر.س</div>{src}</div>
 </div><div style="text-align:center;margin:2px 0"><span style="color:{dc};font-weight:700;font-size:.9rem">الفرق: {diff:+.0f} ر.س</span></div>'''

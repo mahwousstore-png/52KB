@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime
 
 from config import *
-from styles import get_styles, stat_card, vs_card
+from styles import get_styles, stat_card, vs_card, pid_badge
 from engines.engine import (read_file, run_full_analysis, find_missing_products,
                              extract_brand, extract_size, extract_type, is_sample)
 from engines.ai_engine import (call_ai, gemini_chat, chat_with_ai,
@@ -277,9 +277,9 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                          row.get("product_id_comp", ""))).strip()
         comp_pid   = "" if comp_pid in ("nan", "None", "0", "0.0") else comp_pid
 
-        # بطاقة VS
+        # بطاقة VS — مع رقم المنتج مباشرة داخل البطاقة
         st.markdown(vs_card(our_name, our_price, comp_name,
-                            comp_price, diff, comp_src),
+                            comp_price, diff, comp_src, our_pid=our_pid),
                     unsafe_allow_html=True)
 
         # شريط المعلومات
@@ -303,13 +303,11 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
         pend = st.session_state.decisions_pending.get(our_name, {})
         pend_html = decision_badge(pend.get("action", "")) if pend else ""
 
-        pid_html = (f'<span style="color:#777;font-size:0.75rem"> | SKU: '
-                    f'<span style="color:#4a9eff;font-family:monospace">{our_pid}</span></span>'
-                    if our_pid else "")
+        pid_html = f" {pid_badge(our_pid)}" if our_pid else ""
         st.markdown(f"""
         <div style="display:flex;justify-content:space-between;align-items:center;
                     padding:3px 12px;font-size:.8rem;flex-wrap:wrap;gap:4px;">
-          <span>🏷️ <b>{brand}</b> {size} {ptype} {pid_html}</span>
+          <span>🏷️ <b>{brand}</b> {size} {ptype}{pid_html}</span>
           <span>تطابق: <b style="color:{match_color}">{match_pct:.0f}%</b></span>
           {risk_html}
           {price_change_html}
@@ -410,6 +408,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
             if st.button("✅ موافق", key=f"ok_{prefix}_{idx}"):
                 st.session_state.decisions_pending[our_name] = {
                     "action": "approved", "reason": "موافقة يدوية",
+                    "product_id": our_pid,
                     "our_price": our_price, "comp_price": comp_price,
                     "diff": diff, "competitor": comp_src,
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -422,6 +421,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
             if st.button("⏸️ تأجيل", key=f"df_{prefix}_{idx}"):
                 st.session_state.decisions_pending[our_name] = {
                     "action": "deferred", "reason": "تأجيل",
+                    "product_id": our_pid,
                     "our_price": our_price, "comp_price": comp_price,
                     "diff": diff, "competitor": comp_src,
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -434,6 +434,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
             if st.button("🗑️ إزالة", key=f"rm_{prefix}_{idx}"):
                 st.session_state.decisions_pending[our_name] = {
                     "action": "removed", "reason": "إزالة",
+                    "product_id": our_pid,
                     "our_price": our_price, "comp_price": comp_price,
                     "diff": diff, "competitor": comp_src,
                     "ts": datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -485,6 +486,10 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
 with st.sidebar:
     st.markdown(f"## {APP_ICON} {APP_TITLE}")
     st.caption(f"الإصدار {APP_VERSION}")
+
+    # زر تحديث ذكي — يعيد تشغيل التطبيق بدون فقدان البيانات
+    if st.button("🔄 تحديث الصفحة", key="smart_refresh", use_container_width=True):
+        st.rerun()
 
     # حالة AI — تشخيص مفصل
     ai_ok = bool(GEMINI_API_KEYS)

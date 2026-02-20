@@ -1,5 +1,5 @@
 """
-config.py - الإعدادات المركزية v22.0
+config.py - الإعدادات المركزية v23.0
 المفاتيح محمية عبر Streamlit Secrets + Environment Variables
 تحميل كسول (lazy) — لا يحاول الوصول لـ secrets أثناء البناء
 """
@@ -9,7 +9,7 @@ import json as _json
 # ===== معلومات التطبيق =====
 APP_TITLE   = "نظام التسعير الذكي - مهووس"
 APP_NAME    = APP_TITLE
-APP_VERSION = "v22.0"
+APP_VERSION = "v23.0"
 APP_ICON    = "🧪"
 GEMINI_MODEL = "gemini-2.0-flash"
 
