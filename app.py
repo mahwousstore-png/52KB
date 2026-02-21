@@ -219,7 +219,10 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                 res = send_new_products(products)
             else:
                 res = send_price_updates(products)
-            st.success(res["message"]) if res["success"] else st.error(res["message"])
+            if res["success"]:
+                st.success(res["message"])
+            else:
+                st.error(res["message"])
     with ac5:
         # جمع القرارات المعلقة وإرسالها
         pending = {k: v for k, v in st.session_state.decisions_pending.items()
@@ -446,7 +449,10 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                     "comp_name": comp_name, "comp_price": comp_price,
                     "diff": diff, "decision": decision, "competitor": comp_src
                 })
-                st.success(res["message"]) if res["success"] else st.error(res["message"])
+                if res["success"]:
+                    st.success(res["message"])
+                else:
+                    st.error(res["message"])
 
         with b7:  # تحقق AI
             if st.button("🔍 تحقق", key=f"vrf_{prefix}_{idx}"):
@@ -892,7 +898,10 @@ elif page == "🔍 منتجات مفقودة":
                 if st.button("📤 إرسال كل لـ Make", key="miss_make_all"):
                     products = export_to_make_format(filtered, "missing")
                     res = send_missing_products(products)
-                    st.success(res["message"]) if res["success"] else st.error(res["message"])
+                    if res["success"]:
+                        st.success(res["message"])
+                    else:
+                        st.error(res["message"])
 
             st.caption(f"{len(filtered)} منتج — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
@@ -1006,7 +1015,10 @@ elif page == "🔍 منتجات مفقودة":
                             "brand": brand,
                             "الوصف": f"عطر {brand} {_size_str}" if brand else f"عطر {_size_str}",
                         }])
-                        st.success(res["message"]) if res["success"] else st.error(res["message"])
+                        if res["success"]:
+                            st.success(res["message"])
+                        else:
+                            st.error(res["message"])
 
                 with b7:  # تجاهل
                     if st.button("🗑️ تجاهل", key=f"ign_{idx}"):
@@ -1406,7 +1418,10 @@ elif page == "⚡ أتمتة Make":
                             "منتجات جديدة": send_new_products,
                             "مفقودة": send_missing_products}
                     res = func[wh](products)
-                    st.success(res["message"]) if res["success"] else st.error(res["message"])
+                    if res["success"]:
+                        st.success(res["message"])
+                    else:
+                        st.error(res["message"])
 
     with tab3:
         pending = st.session_state.decisions_pending
