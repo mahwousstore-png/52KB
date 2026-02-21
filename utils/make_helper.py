@@ -278,7 +278,7 @@ def send_new_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        payload = {
+        item = {
             "name": name,
             "price": price,
             "product_type": "product",
@@ -293,6 +293,7 @@ def send_new_products(products: List[Dict]) -> Dict:
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
+        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
@@ -305,7 +306,7 @@ def send_new_products(products: List[Dict]) -> Dict:
     return {"success": True, "message": f"✅ تم إرسال {sent} منتج جديد إلى Make{skip_msg}{err_msg}"}
 
 
-# ── إرسال المنتجات المفقودة ─────────────────────────────────────────────
+# ── إرسال المنتجات المفقودة ─────────────────────────────────────────
 def send_missing_products(products: List[Dict]) -> Dict:
     """
     إرسال قائمة المنتجات المفقودة إلى Make.
@@ -324,7 +325,7 @@ def send_missing_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        payload = {
+        item = {
             "name": name,
             "price": price,
             "product_type": "product",
@@ -339,6 +340,7 @@ def send_missing_products(products: List[Dict]) -> Dict:
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
+        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
