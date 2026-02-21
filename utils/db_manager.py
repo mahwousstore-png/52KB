@@ -66,8 +66,14 @@ def init_db():
         total INTEGER DEFAULT 0,
         processed INTEGER DEFAULT 0,
         results_json TEXT DEFAULT '[]',
+        missing_json TEXT DEFAULT '[]',
         our_file TEXT, comp_files TEXT
     )""")
+    # إضافة عمود missing_json إذا لم يكن موجوداً (للتوافق مع قواعد البيانات القديمة)
+    try:
+        c.execute("ALTER TABLE job_progress ADD COLUMN missing_json TEXT DEFAULT '[]'")
+    except:
+        pass  # العمود موجود بالفعل
 
     # تاريخ التحليلات
     c.execute("""CREATE TABLE IF NOT EXISTS analysis_history (
@@ -247,17 +253,19 @@ def get_price_changes(days=7):
 
 # ─── المعالجة الخلفية ──────────────────────
 def save_job_progress(job_id, total, processed, results, status="running",
-                      our_file="", comp_files=""):
+                      our_file="", comp_files="", missing=None):
     conn = get_db()
+    missing_data = json.dumps(missing if missing else [], ensure_ascii=False, default=str)
     conn.execute(
         """INSERT OR REPLACE INTO job_progress
            (job_id,started_at,updated_at,status,total,processed,
-            results_json,our_file,comp_files)
+            results_json,missing_json,our_file,comp_files)
            VALUES (?,
                COALESCE((SELECT started_at FROM job_progress WHERE job_id=?), ?),
-               ?, ?, ?, ?, ?, ?, ?)""",
+               ?, ?, ?, ?, ?, ?, ?, ?)""",
         (job_id, job_id, _ts(), _ts(), status, total, processed,
          json.dumps(results, ensure_ascii=False, default=str),
+         missing_data,
          our_file, comp_files)
     )
     conn.commit(); conn.close()
@@ -274,6 +282,8 @@ def get_job_progress(job_id):
             d = dict(row)
             try: d["results"] = json.loads(d.get("results_json", "[]"))
             except: d["results"] = []
+            try: d["missing"] = json.loads(d.get("missing_json", "[]"))
+            except: d["missing"] = []
             return d
     except: pass
     return None
@@ -290,6 +300,8 @@ def get_last_job():
             d = dict(row)
             try: d["results"] = json.loads(d.get("results_json", "[]"))
             except: d["results"] = []
+            try: d["missing"] = json.loads(d.get("missing_json", "[]"))
+            except: d["missing"] = []
             return d
     except: pass
     return None

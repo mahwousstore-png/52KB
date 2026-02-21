@@ -124,7 +124,8 @@ def _run_analysis_background(job_id, our_df, comp_dfs, our_file_name, comp_names
         }
         save_job_progress(job_id, total, total,
                           analysis_df.to_dict("records"),
-                          "done", our_file_name, comp_names)
+                          "done", our_file_name, comp_names,
+                          missing=missing_df.to_dict("records") if not missing_df.empty else [])
         log_analysis(our_file_name, comp_names, total,
                      len(analysis_df[analysis_df["نسبة_التطابق"] > 0]),
                      len(missing_df))
@@ -613,7 +614,7 @@ if page == "📊 لوحة التحكم":
                         "price_lower": df_all[df_all["القرار"].str.contains("أقل", na=False)].reset_index(drop=True),
                         "approved":    df_all[df_all["القرار"].str.contains("موافق",na=False)].reset_index(drop=True),
                         "review":      df_all[df_all["القرار"].str.contains("مراجعة",na=False)].reset_index(drop=True),
-                        "missing": pd.DataFrame(), "all": df_all,
+                        "missing": pd.DataFrame(last.get("missing", [])) if last.get("missing") else pd.DataFrame(), "all": df_all,
                     }
                     st.session_state.analysis_df = df_all
                     st.rerun()
@@ -696,10 +697,8 @@ elif page == "📂 رفع الملفات":
                         job = get_job_progress(job_id)
                         if job and job["status"] == "done" and job.get("results"):
                             df_all = pd.DataFrame(job["results"])
-                            # استخدام session_state لضمان بقاء البيانات بعد إعادة تشغيل Streamlit
-                            _our_df = st.session_state.get("our_df", our_df)
-                            _comp_dfs = st.session_state.get("comp_dfs", comp_dfs)
-                            missing_df = find_missing_products(_our_df, _comp_dfs) if _our_df is not None and _comp_dfs else pd.DataFrame()
+                            # استعادة المنتجات المفقودة من قاعدة البيانات
+                            missing_df = pd.DataFrame(job.get("missing", [])) if job.get("missing") else pd.DataFrame()
                             st.session_state.results = {
                                 "price_raise": df_all[df_all["القرار"].str.contains("أعلى",na=False)].reset_index(drop=True),
                                 "price_lower": df_all[df_all["القرار"].str.contains("أقل", na=False)].reset_index(drop=True),
