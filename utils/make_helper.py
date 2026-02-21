@@ -279,19 +279,13 @@ def send_new_products(products: List[Dict]) -> Dict:
             skipped += 1
             continue
         item = {
-            "name": name,
-            "price": price,
-            "product_type": "product",
-            "sku": "",
-            "weight": 0.1,
-            "weight_type": "kg",
-            "quantity": 100,
-            "require_shipping": True,
-            "maximum_quantity_per_order": 1,
-            "categories": [],
-            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
-            "cost_price": _safe_float(p.get("cost_price", 0)),
-            "sale_price": _safe_float(p.get("sale_price", 0)),
+            "أسم المنتج": name,
+            "سعر المنتج": price,
+            "رمز المنتج sku": "",
+            "الوزن": 0.1,
+            "سعر التكلفة": _safe_float(p.get("cost_price", 0)),
+            "السعر المخفض": _safe_float(p.get("sale_price", 0)),
+            "الوصف": str(p.get("الوصف", p.get("description", ""))).strip(),
         }
         payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
@@ -326,19 +320,13 @@ def send_missing_products(products: List[Dict]) -> Dict:
             skipped += 1
             continue
         item = {
-            "name": name,
-            "price": price,
-            "product_type": "product",
-            "sku": "",
-            "weight": 0.1,
-            "weight_type": "kg",
-            "quantity": 100,
-            "require_shipping": True,
-            "maximum_quantity_per_order": 1,
-            "categories": [],
-            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
-            "cost_price": _safe_float(p.get("cost_price", 0)),
-            "sale_price": _safe_float(p.get("sale_price", 0)),
+            "أسم المنتج": name,
+            "سعر المنتج": price,
+            "رمز المنتج sku": "",
+            "الوزن": 0.1,
+            "سعر التكلفة": _safe_float(p.get("cost_price", 0)),
+            "السعر المخفض": _safe_float(p.get("sale_price", 0)),
+            "الوصف": str(p.get("الوصف", p.get("description", ""))).strip(),
         }
         payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
