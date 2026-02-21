@@ -278,14 +278,10 @@ def send_new_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        item = {
+        payload = {
             "name": name,
             "price": price,
-            "product_id": pid,
             "product_type": "product",
-            "section": "new",
-            "brand": str(p.get("brand", p.get("الماركة", ""))).strip(),
-            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
             "sku": "",
             "weight": 0.1,
             "weight_type": "kg",
@@ -293,10 +289,10 @@ def send_new_products(products: List[Dict]) -> Dict:
             "require_shipping": True,
             "maximum_quantity_per_order": 1,
             "categories": [],
+            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
-        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
@@ -328,15 +324,10 @@ def send_missing_products(products: List[Dict]) -> Dict:
         if not name:
             skipped += 1
             continue
-        item = {
+        payload = {
             "name": name,
             "price": price,
-            "product_id": pid,
             "product_type": "product",
-            "section": "missing",
-            "brand": str(p.get("brand", p.get("الماركة", ""))).strip(),
-            "competitor": str(p.get("competitor", p.get("المنافس", ""))).strip(),
-            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
             "sku": "",
             "weight": 0.1,
             "weight_type": "kg",
@@ -344,10 +335,10 @@ def send_missing_products(products: List[Dict]) -> Dict:
             "require_shipping": True,
             "maximum_quantity_per_order": 1,
             "categories": [],
+            "description": str(p.get("الوصف", p.get("description", ""))).strip(),
             "cost_price": _safe_float(p.get("cost_price", 0)),
             "sale_price": _safe_float(p.get("sale_price", 0)),
         }
-        payload = {"data": [item]}
         result = _post_to_webhook(WEBHOOK_NEW_PRODUCTS, payload)
         if result["success"]:
             sent += 1
