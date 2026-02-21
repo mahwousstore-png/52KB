@@ -53,6 +53,7 @@ _defaults = {
     "chat_history": [], "job_id": None, "job_running": False,
     "decisions_pending": {},   # {product_name: action}
     "our_df": None, "comp_dfs": None,  # حفظ الملفات للمنتجات المفقودة
+    "hidden_products": set(),  # منتجات أُرسلت لـ Make أو أُزيلت
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
@@ -246,9 +247,13 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
     start = (page_num - 1) * PAGE_SIZE
     page_df = filtered.iloc[start:start + PAGE_SIZE]
 
-    # ── الجدول البصري ─────────────────────────
+       # ── الجدول البصري ─────────────────────
     for idx, row in page_df.iterrows():
         our_name   = str(row.get("المنتج", "—"))
+        # تخطي المنتجات التي أُرسلت لـ Make أو أُزيلت
+        _hide_key = f"{prefix}_{our_name}_{idx}"
+        if _hide_key in st.session_state.hidden_products:
+            continue
         comp_name  = str(row.get("منتج_المنافس", "—"))
         our_price  = safe_float(row.get("السعر", 0))
         comp_price = safe_float(row.get("سعر_المنافس", 0))
@@ -325,7 +330,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                         unsafe_allow_html=True)
 
         # ── أزرار لكل منتج ─────────────────────
-        b1, b2, b3, b4, b5, b6, b7, b8 = st.columns(8)
+        b1, b2, b3, b4, b5, b6, b7, b8, b9 = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1])
 
         with b1:  # AI تحقق ذكي حسب القسم
             _ai_label = {"raise": "🤖 هل نخفض؟", "lower": "🤖 هل نرفع؟",
@@ -423,9 +428,18 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                 }
                 log_decision(our_name, prefix, "removed",
                              "إزالة", our_price, comp_price, diff, comp_src)
-                st.error("🗑️")
+                st.session_state.hidden_products.add(f"{prefix}_{our_name}_{idx}")
+                st.rerun()
 
-        with b6:  # تصدير Make
+        with b6:  # سعر يدوي
+            _auto_price = round(comp_price - 1, 2) if comp_price > 0 else our_price
+            _custom_price = st.number_input(
+                "سعر", value=_auto_price, min_value=0.0,
+                step=1.0, key=f"cp_{prefix}_{idx}",
+                label_visibility="collapsed"
+            )
+
+        with b7:  # تصدير Make
             if st.button("📤 Make", key=f"mk_{prefix}_{idx}"):
                 # سحب رقم المنتج من جميع الأعمدة المحتملة
                 _pid_raw = (
@@ -442,19 +456,18 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                 except (ValueError, TypeError):
                     _pid = str(_pid_raw).strip()
                 if _pid in ("nan", "None", "NaN", ""): _pid = ""
-                _new_price = round(comp_price - 1, 2) if comp_price > 0 else our_price
+                _final_price = _custom_price if _custom_price > 0 else _auto_price
                 res = send_single_product({
                     "product_id": _pid,
-                    "name": our_name, "price": _new_price,
+                    "name": our_name, "price": _final_price,
                     "comp_name": comp_name, "comp_price": comp_price,
                     "diff": diff, "decision": decision, "competitor": comp_src
                 })
                 if res["success"]:
-                    st.success(res["message"])
-                else:
-                    st.error(res["message"])
+                    st.session_state.hidden_products.add(f"{prefix}_{our_name}_{idx}")
+                    st.rerun()
 
-        with b7:  # تحقق AI
+        with b8:  # تحقق AI
             if st.button("🔍 تحقق", key=f"vrf_{prefix}_{idx}"):
                 with st.spinner("🤖"):
                     _vr2 = verify_match(our_name, comp_name, our_price, comp_price)
@@ -462,7 +475,7 @@ def render_pro_table(df, prefix, section_type="update", show_search=True):
                         _mc2 = "🟢 متطابق" if _vr2.get("match") else "🔴 غير متطابق"
                         st.markdown(f"{_mc2} — ثقة: **{_vr2.get('confidence',0)}%**")
 
-        with b8:  # تاريخ السعر
+        with b9:  # تاريخ السعر
             if st.button("📈 تاريخ", key=f"ph_{prefix}_{idx}"):
                 history = get_price_history(our_name, comp_src)
                 if history:
