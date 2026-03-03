@@ -871,7 +871,7 @@ def run_full_analysis(our_df, comp_dfs, progress_callback=None, use_ai=True):
 # ═══════════════════════════════════════════════════════
 def find_missing_products(our_df, comp_dfs):
     our_col  = _fcol(our_df, ["المنتج","اسم المنتج","Product","Name","name"])
-    
+
     # تجهيز بيانات منتجاتنا للبحث السريع
     our_items = []
     for _, r in our_df.iterrows():
@@ -881,6 +881,7 @@ def find_missing_products(our_df, comp_dfs):
         our_items.append({
             "norm": normalize(name),
             "brand": brand,
+            "norm_brand": normalize(brand) if brand else "",
             "pline": extract_product_line(name, brand),
             "size": extract_size(name),
             "type": extract_type(name),
@@ -896,56 +897,74 @@ def find_missing_products(our_df, comp_dfs):
             "SKU","sku","Sku","رمز المنتج","رمز_المنتج","رمز المنتج sku",
             "الكود","كود","Code","code","الرقم","رقم","Barcode","barcode","الباركود"
         ])
-        
+
         for _, row in cdf.iterrows():
             cp = str(row.get(ccol, "")).strip()
             if not cp or is_sample(cp): continue
             cn = normalize(cp)
             if not cn: continue
-            
+
             c_brand = extract_brand(cp)
             c_pline = extract_product_line(cp, c_brand)
             c_size = extract_size(cp)
             c_type = extract_type(cp)
             c_gender = extract_gender(cp)
-            
-            # تصفية المقارنة حسب الماركة لتسريع البحث وزيادة الدقة
+
+            # فلتر ماركة مرن: إذا عرفنا ماركة المنافس، نبحث في منتجاتنا
+            # التي تحمل نفس الماركة + المنتجات التي لم يُتعرف على ماركتها
             if c_brand:
-                candidates = [o for o in our_items if not o["brand"] or normalize(o["brand"]) == normalize(c_brand)]
+                c_brand_norm = normalize(c_brand)
+                candidates = [o for o in our_items
+                              if o["norm_brand"] == c_brand_norm or o["brand"] == ""]
             else:
                 candidates = our_items
-            
+
             is_missing = True
             if candidates:
                 norms = [c["norm"] for c in candidates]
-                # استخدام token_sort_ratio لأنه أدق في ترتيب الكلمات من token_set
-                matches = rf_process.extract(cn, norms, scorer=fuzz.token_sort_ratio, limit=3)
-                
-                for match_norm, match_score, match_idx in matches:
-                    if match_score >= 70:  # إذا كان هناك تشابه مبدئي، نقوم بالتدقيق
-                        matched_item = candidates[match_idx]
-                        penalty = 0
-                        
-                        # تطبيق عقوبات في حال اختلاف المواصفات الجوهرية
-                        if c_size > 0 and matched_item["size"] > 0 and abs(c_size - matched_item["size"]) > 10:
-                            penalty += 25  # حجم مختلف
-                        if c_type and matched_item["type"] and c_type != matched_item["type"]:
-                            penalty += 15  # تركيز مختلف (EDP vs EDT)
-                        if c_gender and matched_item["gender"] and c_gender != matched_item["gender"]:
-                            penalty += 25  # جنس مختلف
-                            
-                        if c_pline and matched_item["pline"]:
-                            pl_score = fuzz.token_sort_ratio(c_pline, matched_item["pline"])
-                            if pl_score < 75:
-                                penalty += 20  # خط إنتاج مختلف
-                                
-                        final_score = match_score - penalty
-                        
-                        # إذا بقي السكور أعلى من 68 بعد العقوبات، إذن المنتج موجود لدينا فعلاً
-                        if final_score >= 85:
-                            is_missing = False
-                            break  # توقف عن البحث، المنتج ليس مفقوداً
-                            
+
+                # البحث باستخدام token_sort_ratio و token_set_ratio معاً
+                matches_sort = rf_process.extract(cn, norms, scorer=fuzz.token_sort_ratio, limit=5)
+                matches_set  = rf_process.extract(cn, norms, scorer=fuzz.token_set_ratio,  limit=5)
+
+                # دمج النتائج: لكل مرشح نأخذ أعلى قيمة من الخوارزميتين
+                best_by_idx = {}
+                for match_norm, match_score, match_idx in matches_sort:
+                    if match_idx not in best_by_idx or match_score > best_by_idx[match_idx]:
+                        best_by_idx[match_idx] = match_score
+                for match_norm, match_score, match_idx in matches_set:
+                    if match_idx not in best_by_idx or match_score > best_by_idx[match_idx]:
+                        best_by_idx[match_idx] = match_score
+
+                # ترتيب المرشحين حسب أعلى سكور
+                sorted_candidates = sorted(best_by_idx.items(), key=lambda x: x[1], reverse=True)
+
+                for match_idx, match_score in sorted_candidates:
+                    if match_score < 60:
+                        break  # لا فائدة من فحص مرشحين بسكور منخفض جداً
+                    matched_item = candidates[match_idx]
+                    penalty = 0
+
+                    # تطبيق عقوبات في حال اختلاف المواصفات الجوهرية
+                    if c_size > 0 and matched_item["size"] > 0 and abs(c_size - matched_item["size"]) > 10:
+                        penalty += 25  # حجم مختلف
+                    if c_type and matched_item["type"] and c_type != matched_item["type"]:
+                        penalty += 15  # تركيز مختلف (EDP vs EDT)
+                    if c_gender and matched_item["gender"] and c_gender != matched_item["gender"]:
+                        penalty += 25  # جنس مختلف
+
+                    if c_pline and matched_item["pline"]:
+                        pl_score = fuzz.token_sort_ratio(c_pline, matched_item["pline"])
+                        if pl_score < 75:
+                            penalty += 20  # خط إنتاج مختلف
+
+                    final_score = match_score - penalty
+
+                    # إذا بقي السكور أعلى من 80 بعد العقوبات، إذن المنتج موجود لدينا فعلاً
+                    if final_score > 80:
+                        is_missing = False
+                        break
+
             if is_missing:
                 seen.add(cn)
                 missing.append({
@@ -956,7 +975,7 @@ def find_missing_products(our_df, comp_dfs):
                     "النوع": c_type, "الجنس": c_gender,
                     "تاريخ_الرصد": datetime.now().strftime("%Y-%m-%d"),
                 })
-                
+
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 # ═══════════════════════════════════════════════════════
 #  تصدير Excel ملوّن
