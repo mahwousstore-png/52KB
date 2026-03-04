@@ -1,0 +1,321 @@
+{
+    "name": "Integration Webhooks, Salla",
+    "flow": [
+        {
+            "id": 2,
+            "module": "gateway:CustomWebHook",
+            "version": 1,
+            "parameters": {
+                "hook": 3899212,
+                "maxResults": 1
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "hook": {
+                            "data": {
+                                "editable": "true"
+                            },
+                            "label": "My gateway-webhook webhook"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "hook",
+                        "type": "hook:gateway-webhook",
+                        "label": "Webhook",
+                        "required": true
+                    },
+                    {
+                        "name": "maxResults",
+                        "type": "number",
+                        "label": "Maximum number of results"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 4,
+            "module": "builtin:BasicFeeder",
+            "version": 1,
+            "parameters": {},
+            "mapper": {
+                "array": "{{2.products}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 245,
+                    "y": 15
+                },
+                "restore": {
+                    "expect": {
+                        "array": {
+                            "mode": "edit",
+                            "items": [
+                                null
+                            ]
+                        }
+                    }
+                },
+                "expect": [
+                    {
+                        "mode": "edit",
+                        "name": "array",
+                        "spec": [],
+                        "type": "array",
+                        "label": "Array"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 49,
+            "module": "salla:UpdateProduct",
+            "version": 1,
+            "parameters": {
+                "__IMTCONN__": 13636204
+            },
+            "mapper": {
+                "id": "{{4.product_id}}",
+                "name": "{{4.name}}",
+                "price": "{{4.price}}"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 603,
+                    "y": 22
+                },
+                "restore": {
+                    "expect": {
+                        "id": {
+                            "mode": "edit",
+                            "label": "{{4.product_id}}"
+                        },
+                        "pinned": {
+                            "mode": "chose"
+                        },
+                        "brand_id": {
+                            "mode": "chose"
+                        },
+                        "categories": {
+                            "mode": "chose"
+                        },
+                        "enable_note": {
+                            "mode": "chose"
+                        },
+                        "product_type": {
+                            "mode": "chose"
+                        },
+                        "hide_quantity": {
+                            "mode": "chose"
+                        },
+                        "require_shipping": {
+                            "mode": "chose"
+                        },
+                        "enable_upload_image": {
+                            "mode": "chose"
+                        }
+                    },
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "data": {
+                                "scoped": "true",
+                                "connection": "salla2"
+                            },
+                            "label": "mahwous_pricing_template"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:salla2,salla",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "id",
+                        "type": "text",
+                        "label": "Select Product",
+                        "required": true
+                    },
+                    {
+                        "name": "name",
+                        "type": "text",
+                        "label": "The New name of The product."
+                    },
+                    {
+                        "name": "price",
+                        "type": "uinteger",
+                        "label": "The New price of The product."
+                    },
+                    {
+                        "name": "product_type",
+                        "type": "select",
+                        "label": "The New type of product."
+                    },
+                    {
+                        "name": "quantity",
+                        "type": "uinteger",
+                        "label": "The New amount of The product."
+                    },
+                    {
+                        "name": "description",
+                        "type": "text",
+                        "label": "The New description of The product."
+                    },
+                    {
+                        "name": "min_amount_donating",
+                        "type": "uinteger",
+                        "label": "The New minimum amount to donate."
+                    },
+                    {
+                        "name": "max_amount_donating",
+                        "type": "uinteger",
+                        "label": "The New mix amount to donate."
+                    },
+                    {
+                        "name": "sale_price",
+                        "type": "uinteger",
+                        "label": "The New sale price of The product."
+                    },
+                    {
+                        "name": "cost_price",
+                        "type": "uinteger",
+                        "label": "The New cost of The New price of The product."
+                    },
+                    {
+                        "name": "sale_end",
+                        "type": "date",
+                        "label": "The New ended date sale of The product."
+                    },
+                    {
+                        "name": "require_shipping",
+                        "type": "boolean",
+                        "label": "If The New product requires shipping or not."
+                    },
+                    {
+                        "name": "maximum_quantity_per_order",
+                        "type": "uinteger",
+                        "label": "Maximum Quantity Per Order"
+                    },
+                    {
+                        "name": "weight",
+                        "type": "uinteger",
+                        "label": "Applicable to The New weight of The product."
+                    },
+                    {
+                        "name": "sku",
+                        "type": "text",
+                        "label": "The New SKU of The product."
+                    },
+                    {
+                        "name": "hide_quantity",
+                        "type": "boolean",
+                        "label": "Whether to hide The New quantity or not."
+                    },
+                    {
+                        "name": "enable_upload_image",
+                        "type": "boolean",
+                        "label": "Enable upload image for The New product."
+                    },
+                    {
+                        "name": "enable_note",
+                        "type": "boolean",
+                        "label": "Allow to customer write notes"
+                    },
+                    {
+                        "name": "pinned",
+                        "type": "boolean",
+                        "label": "if you want to pin The New product."
+                    },
+                    {
+                        "name": "subtitle",
+                        "type": "text",
+                        "label": "The New subtitle of The product."
+                    },
+                    {
+                        "name": "promotion_title",
+                        "type": "text",
+                        "label": "The New promotion title "
+                    },
+                    {
+                        "name": "metadata_title",
+                        "type": "text",
+                        "label": "The New Seo title for product page."
+                    },
+                    {
+                        "name": "metadata_description",
+                        "type": "text",
+                        "label": "The New Seo description for product page."
+                    },
+                    {
+                        "name": "categories",
+                        "type": "select",
+                        "label": "Select Categories",
+                        "multiple": true
+                    },
+                    {
+                        "name": "brand_id",
+                        "type": "select",
+                        "label": "Select Brands"
+                    }
+                ]
+            },
+            "onerror": [
+                {
+                    "id": 40,
+                    "module": "builtin:Ignore",
+                    "version": 1,
+                    "filter": {
+                        "name": "Catch BundleValidationError",
+                        "conditions": [
+                            [
+                                {
+                                    "a": "{{49.error.type}}",
+                                    "b": "BundleValidationError",
+                                    "o": "text:equal"
+                                }
+                            ]
+                        ]
+                    },
+                    "metadata": {
+                        "designer": {
+                            "x": 1079,
+                            "y": 5
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "eu2.make.com",
+        "notes": []
+    }
+}
