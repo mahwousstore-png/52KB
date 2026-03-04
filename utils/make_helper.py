@@ -69,8 +69,8 @@ def send_new_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def send_missing_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """إرسال المنتجات المفقودة إلى Make"""
-    return _send_to_webhook(WEBHOOK_NEW_PRODUCTS, products)
+    """إرسال المنتجات المفقودة (تُرسل عبر نفس Webhook المنتجات الجديدة) إلى Make"""
+    return send_new_products(products)
 
 
 def send_single_product(product: Dict[str, Any]) -> Dict[str, Any]:
