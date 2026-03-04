@@ -90,6 +90,15 @@ def init_db():
         response TEXT, source TEXT
     )""")
 
+    # المنتجات المخفية (أُرسلت لـ Make أو حُذفت أو تم تجاهلها)
+    c.execute("""CREATE TABLE IF NOT EXISTS hidden_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT, product_name TEXT,
+        competitor TEXT, action TEXT,
+        price REAL DEFAULT 0,
+        section TEXT DEFAULT 'missing'
+    )""")
+
     conn.commit()
     conn.close()
 
@@ -347,6 +356,36 @@ def get_events(page=None, limit=50):
         conn.close()
         return [dict(r) for r in rows]
     except: return []
+
+
+# ─── المنتجات المخفية ──────────────────────
+def save_hidden_product(product_name, competitor="", action="ignored",
+                        price=0, section="missing"):
+    """حفظ منتج مخفي في قاعدة البيانات"""
+    try:
+        conn = get_db()
+        conn.execute(
+            """INSERT INTO hidden_products
+               (timestamp, product_name, competitor, action, price, section)
+               VALUES (?,?,?,?,?,?)""",
+            (_ts(), product_name, competitor, action, price, section)
+        )
+        conn.commit(); conn.close()
+    except: pass
+
+
+def get_hidden_product_keys(section="missing"):
+    """إرجاع مجموعة مفاتيح المنتجات المخفية للتصفية السريعة"""
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT product_name, competitor FROM hidden_products WHERE section=?",
+            (section,)
+        ).fetchall()
+        conn.close()
+        return {(r["product_name"], r["competitor"]) for r in rows}
+    except:
+        return set()
 
 
 init_db()

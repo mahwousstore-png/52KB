@@ -39,7 +39,8 @@ from utils.db_manager import (init_db, log_event, log_decision,
                                log_analysis, get_events, get_decisions,
                                get_analysis_history, upsert_price_history,
                                get_price_history, get_price_changes,
-                               save_job_progress, get_job_progress, get_last_job)
+                               save_job_progress, get_job_progress, get_last_job,
+                               save_hidden_product, get_hidden_product_keys)
 
 # ── إعداد الصفحة ──────────────────────────
 st.set_page_config(page_title=APP_TITLE, page_icon=APP_ICON,
@@ -916,6 +917,22 @@ elif page == "🔍 منتجات مفقودة":
                     else:
                         st.error(res["message"])
 
+            # تحميل المنتجات المخفية من قاعدة البيانات
+            _hidden_db = get_hidden_product_keys("missing")
+
+            # تصفية المنتجات المخفية (من الجلسة + من قاعدة البيانات)
+            _visible_rows = []
+            for _fi, _fr in filtered.iterrows():
+                _fn = str(_fr.get("منتج_المنافس", ""))
+                _fc = str(_fr.get("المنافس", ""))
+                _hide_key = f"missing_{_fn}_{_fi}"
+                if _hide_key in st.session_state.hidden_products:
+                    continue
+                if (_fn, _fc) in _hidden_db:
+                    continue
+                _visible_rows.append(_fi)
+            filtered = filtered.loc[_visible_rows]
+
             st.caption(f"{len(filtered)} منتج — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
             # عرض كل منتج
@@ -949,7 +966,7 @@ elif page == "🔍 منتجات مفقودة":
                   </div>
                 </div>""", unsafe_allow_html=True)
 
-                b1, b2, b3, b4, b5, b6, b7, b8 = st.columns(8)
+                b1, b2, b3, b4, b5, b6, b7 = st.columns(7)
 
                 with b1:  # صورة + مكونات
                     if st.button("🖼️ صورة", key=f"img_{idx}"):
@@ -1029,14 +1046,19 @@ elif page == "🔍 منتجات مفقودة":
                             "الوصف": f"عطر {brand} {_size_str}" if brand else f"عطر {_size_str}",
                         }])
                         if res["success"]:
-                            st.success(res["message"])
+                            save_hidden_product(name, comp, "sent_to_make", price, "missing")
+                            log_decision(name, "missing", "sent_to_make", "إرسال لـ Make", 0, price, -price, comp)
+                            st.session_state.hidden_products.add(f"missing_{name}_{idx}")
+                            st.rerun()
                         else:
                             st.error(res["message"])
 
-                with b7:  # تجاهل
-                    if st.button("🗑️ تجاهل", key=f"ign_{idx}"):
-                        log_decision(name, "missing", "ignored", "تجاهل", 0, price, -price, comp)
-                        st.warning("تم")
+                with b7:  # حذف نهائي
+                    if st.button("🗑️ حذف", key=f"ign_{idx}"):
+                        save_hidden_product(name, comp, "deleted", price, "missing")
+                        log_decision(name, "missing", "deleted", "حذف نهائي", 0, price, -price, comp)
+                        st.session_state.hidden_products.add(f"missing_{name}_{idx}")
+                        st.rerun()
 
                 st.markdown('<hr style="border:none;border-top:1px solid #111;margin:4px 0">',
                             unsafe_allow_html=True)
